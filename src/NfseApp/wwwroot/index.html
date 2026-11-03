@@ -176,6 +176,21 @@
   tr.cancelada .valor-cancelado { text-decoration: line-through; }
   .nome-doc .doc { font-size: 12px; color: var(--muted); }
   .acoes { white-space: nowrap; text-align: right; }
+  table.lista .nnota .dps { font-size: 11.5px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+  /* Botão dividido: a ação principal e, na setinha, as alternativas. */
+  .dividido { display: inline-flex; }
+  .dividido .btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .dividido .btn + .btn { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; padding-left: 5px; padding-right: 5px; }
+  .menu { position: fixed; z-index: 50; width: 310px; background: var(--card); border: 1px solid var(--linha); border-radius: 10px;
+          box-shadow: 0 10px 30px rgb(0 0 0 / .16); padding: 4px; }
+  .menu button { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 7px; padding: 9px 11px;
+                 color: var(--txt); font: inherit; cursor: pointer; white-space: normal; }
+  .menu button:hover, .menu button:focus-visible { background: var(--campo); outline: none; }
+  .menu strong { display: block; font-size: 13px; font-weight: 600; }
+  .menu span { display: block; font-size: 12px; color: var(--sub); margin-top: 2px; line-height: 1.45; }
+  .aviso-flutuante { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; width: max-content;
+                     max-width: min(560px, calc(100vw - 32px)); background: var(--card); color: var(--txt); border: 1px solid var(--linha);
+                     border-radius: 10px; box-shadow: 0 10px 30px rgb(0 0 0 / .16); padding: 11px 16px; font-size: 13.5px; line-height: 1.5; }
   .barra-ferramentas { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--linha); flex-wrap: wrap; }
   .chips { display: inline-flex; background: var(--campo); border: 1px solid var(--linha); border-radius: 8px; padding: 2px; }
   .chips button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--sub); }
@@ -304,6 +319,7 @@ const ICONES = {
   sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
   lua: '<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/>',
   seta: '<path d="m9 6 6 6-6 6"/>',
+  abaixo: '<path d="m7 10 5 5 5-5"/>',
   recolher: '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
   expandir: '<path d="m13 17 5-5-5-5M6 17l5-5-5-5"/>',
   certificado: '<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M7 9h10M7 12.5h6"/><circle cx="17" cy="17.5" r="2.5"/>',
@@ -610,6 +626,71 @@ function desenharGrafico(alvo, meses) {
   });
 }
 
+// ---------- PDF ----------
+// O PDF oficial fica no portal nacional, que pede um captcha para baixar; o app abre a nota lá, no navegador da pessoa.
+// A prévia gerada pelo app (modelo da NT 008) fica na setinha, para quando o portal não estiver à mão.
+const botaoPdf = (chave, classe = "") => `<span class="dividido">
+  <button class="btn sec ${classe}" data-pdf="${chave}" title="Abre a nota no portal nacional (Emissor Nacional), onde fica o PDF oficial">${icone("pdf")} PDF</button>
+  <button class="btn sec ${classe}" data-pdf-menu="${chave}" title="Outras opções de PDF" aria-label="Outras opções de PDF" aria-haspopup="menu">${icone("abaixo")}</button>
+</span>`;
+
+async function abrirPdfOficial(chave) {
+  try {
+    await post(`/api/notas/${chave}/portal?amb=${estado.amb}`);
+    avisoFlutuante("Abrindo a nota no portal nacional, no seu navegador. Se o portal pedir login, entre com o certificado digital: a nota aparece na página inicial. O PDF fica no botão PDF da nota.");
+  } catch (e) { avisoFlutuante("Não consegui abrir o portal: " + e.message); }
+}
+
+function fecharMenuPdf() {
+  document.querySelector(".menu")?.remove();
+  document.querySelectorAll('[data-pdf-menu][aria-expanded="true"]').forEach(b => b.setAttribute("aria-expanded", "false"));
+}
+
+function abrirMenuPdf(botao, chave) {
+  const menu = document.createElement("div");
+  menu.className = "menu";
+  menu.setAttribute("role", "menu");
+  menu.innerHTML = `
+    <button role="menuitem" data-opcao="oficial"><strong>PDF oficial no portal</strong>
+      <span>Abre a nota no Emissor Nacional. Para baixar, o portal pede o certificado e um captcha.</span></button>
+    <button role="menuitem" data-opcao="previa"><strong>Prévia gerada pelo app</strong>
+      <span>Na hora e sem internet, no modelo da NT 008/2026. Pode ter pequenas diferenças do oficial.</span></button>`;
+  // Dentro de um diálogo aberto, o menu precisa ficar no diálogo; fora dele, o diálogo cobriria o menu.
+  (botao.closest("dialog") || document.body).appendChild(menu);
+  const r = botao.getBoundingClientRect(), altura = menu.offsetHeight;
+  menu.style.left = Math.max(8, r.right - menu.offsetWidth) + "px";
+  menu.style.top = (r.bottom + 6 + altura > innerHeight ? r.top - 6 - altura : r.bottom + 6) + "px";
+  menu.querySelector("[data-opcao=oficial]").onclick = () => { fecharMenuPdf(); abrirPdfOficial(chave); };
+  menu.querySelector("[data-opcao=previa]").onclick = () => { fecharMenuPdf(); open(`/api/notas/${chave}/pdf?amb=${estado.amb}`, "_blank"); };
+  menu.querySelector("button").focus();
+}
+
+let temporizadorAviso;
+function avisoFlutuante(texto) {
+  document.querySelector(".aviso-flutuante")?.remove();
+  const el = document.createElement("div");
+  el.className = "aviso-flutuante";
+  el.setAttribute("role", "status");
+  el.textContent = texto;
+  (document.querySelector("dialog[open]") || document.body).appendChild(el);
+  clearTimeout(temporizadorAviso);
+  temporizadorAviso = setTimeout(() => el.remove(), 9000);
+}
+
+document.addEventListener("click", e => {
+  const pdf = e.target.closest("[data-pdf]"), menu = e.target.closest("[data-pdf-menu]");
+  if (pdf) abrirPdfOficial(pdf.dataset.pdf);
+  else if (menu) {
+    const aberto = menu.getAttribute("aria-expanded") === "true";
+    fecharMenuPdf();
+    if (!aberto) { menu.setAttribute("aria-expanded", "true"); abrirMenuPdf(menu, menu.dataset.pdfMenu); }
+  }
+  else if (!e.target.closest(".menu")) fecharMenuPdf();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.querySelector(".menu")) { e.preventDefault(); fecharMenuPdf(); } });
+addEventListener("scroll", fecharMenuPdf, true);
+addEventListener("resize", fecharMenuPdf);
+
 // ---------- notas ----------
 function tabelaNotas(lista, filtro, comTotais) {
   if (!lista.length) return `<div class="vazio">Nenhuma nota ${filtro} neste ambiente.</div>`;
@@ -626,7 +707,7 @@ function tabelaNotas(lista, filtro, comTotais) {
       <tbody>
       ${lista.map(n => `
         <tr class="${n.cancelada ? "cancelada" : ""}">
-          <td class="nnota" title="Chave de acesso: ${n.chave}">${n.numero}</td>
+          <td class="nnota" title="Chave de acesso: ${n.chave}">${n.numero}${n.nDps && n.nDps !== n.numero ? `<div class="dps" title="Número da DPS (a sua sequência). O número da NFS-e é dado pelo Sistema Nacional.">DPS ${n.nDps}</div>` : ""}</td>
           <td class="nome-doc">${esc(n[outra + "Nome"])}<div class="doc">${doc(n[outra + "Doc"])}</div></td>
           <td>${data(n.competencia)}</td><td>${data(n.dhProc)}</td>
           <td class="num"><span class="valor-cancelado">${brl(n.vServ)}</span></td>
@@ -636,7 +717,7 @@ function tabelaNotas(lista, filtro, comTotais) {
             : `<span class="pilula ok" title="Autorizada pela Sefin e válida">Autorizada</span>`}</td>
           <td class="acoes">
             <a class="btn sec icone" href="/api/notas/${n.chave}/xml?amb=${estado.amb}" title="Baixar o XML oficial da nota (o documento fiscal em si)">${icone("baixar")} XML</a>
-            <a class="btn sec icone" href="/api/notas/${n.chave}/pdf?amb=${estado.amb}" target="_blank" title="Gerar o DANFSe (PDF) no modelo oficial da NT 008/2026. Leva alguns segundos.">${icone("pdf")} PDF</a>
+            ${botaoPdf(n.chave, "icone")}
           </td>
         </tr>`).join("")}
       </tbody>
@@ -653,7 +734,7 @@ async function telaNotas(aviso) {
   const desenhar = () => {
     const termo = estado.busca.trim().toLowerCase();
     const outra = estado.filtro === "emitidas" ? "toma" : "prest";
-    const lista = notas[estado.filtro].filter(n => !termo || String(n.numero).includes(termo)
+    const lista = notas[estado.filtro].filter(n => !termo || String(n.numero).includes(termo) || String(n.nDps).includes(termo)
       || (n[outra + "Nome"] || "").toLowerCase().includes(termo) || (n[outra + "Doc"] || "").includes(termo.replace(/\D/g, "") || "#"));
     $("lista-notas").innerHTML = tabelaNotas(lista, estado.filtro, true);
   };
@@ -869,13 +950,13 @@ function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
           <div class="dlg-corpo">
             <div class="numero-grande" style="font-size:34px;font-weight:600">NFS-e nº ${esc(r.numero)}</div>
             <div class="sub" style="margin:4px 0 14px">${esc(b.tomaNome)} · ${brl(dados.vServ)}</div>
-            <div class="muted" style="font-size:12px;word-break:break-all">Chave ${esc(r.chave)}</div>
+            <div class="muted" style="font-size:12px;word-break:break-all">DPS nº ${esc(r.nDps)} · Chave ${esc(r.chave)}</div>
             ${r.alertas.length ? `<div style="margin-top:12px">${mensagem("info", "Alertas: " + r.alertas.map(esc).join("<br>"))}</div>` : ""}
             ${r.ajustes?.length ? `<div style="margin-top:12px">${mensagem("info", "A Sefin recusou o primeiro formato (recusa não cria nota) e o app ajustou: " + r.ajustes.map(esc).join("; ") + ".")}</div>` : ""}
           </div>
           <div class="dlg-rodape">
             <a class="btn sec" href="/api/notas/${r.chave}/xml?amb=${estado.amb}">${icone("baixar")} XML</a>
-            <a class="btn sec" href="/api/notas/${r.chave}/pdf?amb=${estado.amb}" target="_blank">${icone("pdf")} PDF</a>
+            ${botaoPdf(r.chave)}
             <button class="btn" id="ver-notas">Ver notas</button>
           </div>`;
         $("ver-notas").onclick = () => { dlg.close(); mostrar("notas"); };

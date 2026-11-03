@@ -31,7 +31,8 @@ public static class Janela
         catch { AbrirNavegador(url); return null; }
     }
 
-    private static void AbrirNavegador(string url)
+    /// <summary>Abre no navegador padrão do usuário (onde ele já tem as sessões e os downloads dele).</summary>
+    public static void AbrirNavegador(string url)
     {
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { /* sem navegador: nada a fazer */ }
     }

@@ -33,6 +33,12 @@ Nada é cadastrado à mão. Tudo vem do Sistema Nacional da NFS-e pelo certifica
   novo, emita a primeira nota pelo Emissor Nacional; depois ele aparece no app.
 - **Nota nova:** copia a última nota válida do tomador e troca só o que você editou.
 
+**Número da nota e número da DPS:** a DPS é a sua sequência (série 1: ..., 179, 180, 181). O número da NFS-e é dado
+por quem gera a nota. Até a 179, as notas eram geradas pelo sistema da prefeitura, que usava o mesmo número da DPS
+(`ambGer=1`, transcrita). As notas emitidas pelo app são geradas pelo Sistema Nacional (`ambGer=2`), que tem
+numeração própria e começou em 1: a DPS 180 virou a NFS-e nº 1. A lista mostra os dois quando são diferentes, e a
+busca encontra pelos dois.
+
 Cópia local do que já foi baixado ou emitido: `%LOCALAPPDATA%\NfseApp\{CNPJ}\{prod|hom}\`
 - `nfse/`: XML das notas baixadas do ADN e das emitidas pelo app
 - `eventos/`: cancelamentos
@@ -106,6 +112,7 @@ A bateria roda contra o `.exe` de verdade, no Windows, com o certificado instala
 - inicialização, segurança (403/401) e login;
 - leitura do ADN, notas, tomadores e XML;
 - DANFSe: conteúdo, QR Code, marca d'água, aviso de homologação, PDF de 1 página A4;
+- PDF oficial: abre a nota certa no portal de cada ambiente, e nada abre com chave inválida, sem login ou sem o cabeçalho do app;
 - proteções de produção;
 - validações dos campos;
 - emissão real em **homologação**, com o XML conferido campo a campo, a DPS validada no XSD oficial e a assinatura verificada;
@@ -126,10 +133,17 @@ gh release create vX.Y.Z dist/reduzido/producao/NfseApp.exe dist/reduzido/teste/
 
 ### PDF da nota (DANFSe)
 
-A Receita suspendeu a API nacional de DANFSe em 03/08/2026
+O botão **PDF** abre a nota no portal nacional (Emissor Nacional), no navegador padrão:
+`https://www.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/{chave}` (em homologação, `www.producaorestrita...`).
+O PDF oficial fica lá. O app não baixa sozinho porque o portal pede um captcha (hCaptcha) para baixar o PDF ou o XML,
+e a API nacional de DANFSe está suspensa desde 03/08/2026
 ([NT 008/2026 SE/CGNFS-e, v1.02](https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/rtc/nt-008-se-cgnfse-danfse-20260714-v1-02.pdf)).
-Desde então, o sistema emissor é quem gera o DANFSe. O app gera localmente, sem rede, a partir do XML guardado
-(`Danfse.cs`), seguindo o modelo do Anexo I da nota:
+Se o navegador não estiver logado no portal, ele cai no login. O acesso por certificado leva para a página inicial,
+que lista as últimas notas.
+
+Na setinha ao lado do botão fica a **prévia gerada pelo app**: na hora, sem rede, a partir do XML guardado
+(`Danfse.cs`), seguindo o modelo do Anexo I da NT 008. Ela não é idêntica ao PDF do portal (ex.: a linha de
+totais aproximados de tributos). A prévia segue:
 - A4, uma página, com as medidas, fontes e sombreamentos do item 2.4;
 - só o que está no XML; campo sem informação sai como "-" (nota 12);
 - QR Code apontando para a consulta pública da chave, gerado com a biblioteca QRCoder;

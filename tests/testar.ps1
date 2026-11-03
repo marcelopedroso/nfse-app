@@ -241,6 +241,19 @@ try {
     Ok 'PDF tem uma página só (NT 008, item 2.2)' ($paginas -eq 1) "páginas: $paginas"
     Ok 'PDF em A4 retrato' ($pdfTexto -match '/MediaBox \[0 0 59[45]\.\d+ 84[12]\.\d+\]')
 
+    Secao 'PDF oficial no portal (o app só abre a nota; o portal pede captcha para baixar)'
+    $r = Chamar $cli POST "$base/api/notas/$($nv.chave)/portal?amb=prod" @{}
+    Ok 'abre a nota no Emissor Nacional de produção' ($r.Status -eq 200 -and $r.Json.url -eq "https://www.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/$($nv.chave)") "HTTP $($r.Status) $($r.Json.url)"
+    $r = Chamar $cli POST "$base/api/notas/$($nv.chave)/portal?amb=prod" @{} -SemCabecalho
+    Ok 'sem o cabeçalho do app: 403 (outro site não abre o navegador)' ($r.Status -eq 403)
+    $r = Chamar $cli POST "$base/api/notas/1234%26calc/portal?amb=prod" @{}
+    Ok 'chave que não é de nota: 404, nada é aberto' ($r.Status -eq 404) "HTTP $($r.Status)"
+    $r = Chamar $cli POST "$base/api/notas/$('9' * 50)/portal?amb=prod" @{}
+    Ok 'chave de nota que não é deste CNPJ: 404' ($r.Status -eq 404) "HTTP $($r.Status)"
+    $r = Chamar (NovoCliente) POST "$base/api/notas/$($nv.chave)/portal?amb=prod" @{}
+    Ok 'sem login: 401' ($r.Status -eq 401) "HTTP $($r.Status)"
+    Ok 'nota mostra o número da DPS ao lado do da NFS-e' ($null -ne $nv.nDps -and $nv.nDps -gt 0) "nDps $($nv.nDps)"
+
     # ------------------------------------------------------------------ assinatura sem rede
     Secao 'Assinatura sem rede (autoteste do .exe, nas duas edições)'
     $pa = Start-Process -FilePath $exe -ArgumentList @('--autoteste', "`"$tmp\autoteste.xml`"", "`"$tmp\autoteste-prod.xml`"") -PassThru -Wait `
@@ -335,6 +348,8 @@ try {
         $hh = [Net.WebUtility]::HtmlDecode((Chamar $cli GET "$base/api/notas/$($e1.chave)/danfse?amb=hom").Texto)
         Ok 'DANFSe de homologação: "NFS-e SEM VALIDADE JURÍDICA"' ($hh.Contains('NFS-e SEM VALIDADE JURÍDICA') -and $hh.Contains('Tipo de Ambiente: Homologação'))
         Ok 'DANFSe mostra o e-mail editado e o valor' ($hh.Contains('teste.nfseapp@example.com') -and $hh.Contains('R$ 1.234,56'))
+        $r = Chamar $cli POST "$base/api/notas/$($e1.chave)/portal?amb=hom" @{}
+        Ok 'PDF oficial de homologação abre no portal da produção restrita' ($r.Json.url -eq "https://www.producaorestrita.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/$($e1.chave)") $r.Json.url
 
         $dps = Get-ChildItem "$pastaHom\dps" -Filter "*$('{0:D15}' -f [int64]$e1.nDps).xml" | Select-Object -First 1
         Ok 'DPS assinada foi guardada' ($null -ne $dps)

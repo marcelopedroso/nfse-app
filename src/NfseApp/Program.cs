@@ -263,6 +263,19 @@ app.MapGet("/api/notas/{chave}/pdf", async (string chave, string? amb, HttpConte
     catch (Exception e) { return Results.Text("Não consegui gerar o PDF: " + e.Message, "text/plain; charset=utf-8", statusCode: 500); }
 });
 
+// PDF oficial: fica no portal (Emissor Nacional), que só entrega o arquivo depois de um captcha. Então o app abre a nota
+// no navegador do usuário e quem baixa é a pessoa. Com --sem-navegador (testes), só devolve o endereço.
+app.MapPost("/api/notas/{chave}/portal", (string chave, string? amb, HttpContext ctx) =>
+{
+    if (Sessao(ctx) is not { } s) return Erro(401, "Não logado.");
+    var ambiente = Ambiente.De(amb);
+    if (!Regex.IsMatch(chave, @"^\d{50}$") || new Repositorio(s.Info.Documento, ambiente).Xml(chave) == null)
+        return Erro(404, "Nota não encontrada.");
+    var url = $"{ambiente.Portal}/Notas/Visualizar/Index/{chave}";
+    if (abrirNavegador) Janela.AbrirNavegador(url);
+    return Results.Ok(new { url });
+});
+
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     // Com porta 0, só depois de subir dá para saber qual porta o sistema escolheu.
