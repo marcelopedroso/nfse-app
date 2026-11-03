@@ -220,7 +220,7 @@
   .dlg-corpo tr.destaque td { font-weight: 700; font-size: 15px; border-bottom: 0; padding-top: 12px; }
   .dlg-rodape { padding: 14px 22px 18px; display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
   .confirmo { display: flex; gap: 9px; align-items: flex-start; padding: 12px 14px; margin: 12px 0 4px; border-radius: 10px;
-              background: var(--erro-fundo); color: var(--txt); font-size: 13.5px; cursor: pointer; }
+              background: var(--campo); border: 1px solid var(--linha); color: var(--txt); font-size: 13.5px; cursor: pointer; }
   .confirmo input { width: auto; margin-top: 3px; }
 
   /* ---------- login ---------- */
@@ -286,7 +286,9 @@ const nomeAmb = a => a === "prod" ? "Produção" : "Homologação";
 const iniciais = nome => (nome || "?").replace(/\b(S\.?A\.?|LTDA\.?|ME|EPP|EIRELI)\b/gi, "").trim().split(/\s+/).slice(0, 2).map(p => p[0]).join("").toUpperCase();
 const nomeCurto = nome => (nome || "").split(/\s+/).slice(0, 3).join(" ");
 const ajuda = texto => `<span class="ajuda" title="${esc(texto)}">?</span>`;
-const pilulaAmb = a => `<span class="pilula ${a}" title="${a === "prod" ? "Notas emitidas aqui são reais, com valor fiscal" : "Ambiente de teste da Receita: nada aqui tem valor fiscal"}">${nomeAmb(a)}</span>`;
+// O selo de ambiente só aparece na edição que tem os dois; na do dia a dia tudo é produção e o selo seria ruído.
+const pilulaAmb = a => !estado.info?.temHomologacao ? "" :
+  `<span class="pilula ${a}" title="${a === "prod" ? "Produção: notas com validade fiscal" : "Homologação: ambiente de testes da Receita, sem validade fiscal"}">${nomeAmb(a)}</span>`;
 
 // ---------- ícones (traço fino, cor do texto) ----------
 const ICONES = {
@@ -377,16 +379,14 @@ function montarLateral() {
       <button data-tela="tomadores" title="Tomadores">${icone("tomadores")}<span class="txt">Tomadores</span></button>
     </nav>
     <div class="rodape-lat">
-      <div>
+      ${i.temHomologacao ? `<div>
         <div class="rotulo-lat">Ambiente</div>
-        ${i.temHomologacao
-          ? `<div class="segmentado" title="Homologação: ambiente de teste da Receita, sem valor fiscal. Produção: notas reais.">
-               <button data-amb="prod" class="${estado.amb === "prod" ? "ativo" : ""}">Produção</button>
-               <button data-amb="hom" class="${estado.amb === "hom" ? "ativo" : ""}">Homologação</button>
-             </div>`
-          : `<div class="amb-fixo" title="Esta versão só emite em produção (notas reais)"><span class="ponto"></span><span class="txt">Produção</span></div>`}
-        ${i.temHomologacao ? `<div class="amb-recolhido" title="Ambiente: ${nomeAmb(estado.amb)}. Abra a barra para trocar."><span class="ponto ${estado.amb === "hom" ? "hom" : ""}"></span></div>` : ""}
-      </div>
+        <div class="segmentado" title="Homologação: ambiente de testes da Receita, sem validade fiscal. Produção: notas com validade fiscal.">
+          <button data-amb="prod" class="${estado.amb === "prod" ? "ativo" : ""}">Produção</button>
+          <button data-amb="hom" class="${estado.amb === "hom" ? "ativo" : ""}">Homologação</button>
+        </div>
+        <div class="amb-recolhido" title="Ambiente: ${nomeAmb(estado.amb)}. Abra a barra para trocar."><span class="ponto ${estado.amb === "hom" ? "hom" : ""}"></span></div>
+      </div>` : ""}
       <div class="cert-lat" title="Certificado em uso: ${esc(p.nome)} · ${doc(p.documento)}">
         <span class="avatar">${esc(iniciais(p.nome))}</span>
         <div><div class="nome">${esc(p.nome)}</div><div class="doc">${doc(p.documento)}</div></div>
@@ -488,7 +488,7 @@ async function telaInicio() {
     <div class="conteudo">
       <div class="cabecalho">
         <div><h1>${MESES[mes][0].toUpperCase() + MESES[mes].slice(1)} de ${ano}</h1>
-          <div class="sub">${pilulaAmb(estado.amb)} &nbsp;${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</div></div>
+          <div class="sub">${pilulaAmb(estado.amb) ? pilulaAmb(estado.amb) + " &nbsp;" : ""}${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</div></div>
         <div class="direita">
           <button class="btn sec" id="sync" title="Busca no Ambiente de Dados Nacional (ADN) as notas e cancelamentos novos">${icone("atualizar")} Atualizar</button>
           <button class="btn" data-ir="nova">${icone("mais")} Nova nota</button>
@@ -660,7 +660,7 @@ async function telaNotas(aviso) {
   app.innerHTML = `
     <div class="conteudo">
       <div class="cabecalho">
-        <div><h1>Notas</h1><div class="sub">${pilulaAmb(estado.amb)} &nbsp;${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</div></div>
+        <div><h1>Notas</h1><div class="sub">${pilulaAmb(estado.amb) ? pilulaAmb(estado.amb) + " &nbsp;" : ""}${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</div></div>
         <div class="direita">
           <button class="btn sec" id="sync" title="Busca no Ambiente de Dados Nacional (ADN) as notas e cancelamentos novos deste CNPJ">${icone("atualizar")} Atualizar</button>
           <button class="btn" id="nova">${icone("mais")} Nova nota</button>
@@ -737,7 +737,7 @@ async function telaNova(tomador) {
   app.innerHTML = `
     <div class="conteudo">
       <div class="cabecalho">
-        <div><h1>Nova nota</h1><div class="sub">${pilulaAmb(estado.amb)} &nbsp;Mesmo tomador, serviço e tributação da nota anterior; ajuste o que mudou.</div></div>
+        <div><h1>Nova nota</h1><div class="sub">${pilulaAmb(estado.amb) ? pilulaAmb(estado.amb) + " &nbsp;" : ""}Mesmo tomador, serviço e tributação da nota anterior; ajuste o que mudou.</div></div>
       </div>
       ${info.aviso ? mensagem("erro", esc(info.aviso)) : ""}
       <div class="nova">
@@ -749,7 +749,7 @@ async function telaNova(tomador) {
               <label class="campo inteiro"><span>Cliente ${ajuda("Clientes que já receberam nota sua. Trocar o cliente muda a nota-base para a última nota dele.")}</span>
                 <select id="tomador">${tomadores.map(x => `<option value="${x.documento}" ${x.documento === b.tomaDoc ? "selected" : ""}>${esc(x.nome)} · ${doc(x.documento)}</option>`).join("")}</select></label>
               <label class="campo"><span>E-mail ${ajuda(info.emailTomadorRemovido
-                  ? "Em homologação o e-mail da nota real não é usado, para o teste não chegar ao cliente. Se quiser, digite um e-mail seu."
+                  ? "Em homologação o e-mail do cliente não é usado, para o teste não chegar a ele. Se quiser, informe um e-mail seu."
                   : "Veio da nota anterior. Se o cliente mudou de e-mail, corrija aqui: a nota nova sai com o e-mail novo e as próximas também.")}</span>
                 <input id="email" type="email" maxlength="80" value="${esc(s.emailTomador)}" placeholder="${info.emailTomadorRemovido ? "opcional: um e-mail seu para testar" : "sem e-mail"}"></label>
               <label class="campo"><span>Telefone ${ajuda("Só números, com DDD (6 a 20 dígitos). Opcional.")}</span>
@@ -791,7 +791,7 @@ async function telaNova(tomador) {
             <div class="sub" style="font-size:12.5px">Valor líquido ${ajuda("Estimativa: valor do serviço menos o desconto. O valor oficial é calculado pela Sefin e aparece na nota.")}</div>
             <div class="numero-grande" id="r-liq"></div>
           </div>
-          <div class="meta">${pilulaAmb(estado.amb)}<br>Série ${info.serie} · DPS nº ${info.proximoNDps} ${ajuda("Número da Declaração de Prestação de Serviço: sequência sua; o app usa o próximo depois do último já autorizado. O número da NFS-e é dado pela Sefin.")}</div>
+          <div class="meta">${pilulaAmb(estado.amb) ? pilulaAmb(estado.amb) + "<br>" : ""}Série ${info.serie} · DPS nº ${info.proximoNDps} ${ajuda("Número da Declaração de Prestação de Serviço: sequência sua; o app usa o próximo depois do último já autorizado. O número da NFS-e é dado pela Sefin.")}</div>
           <button class="btn" id="revisar" title="Mostra o resumo completo para conferir. Ainda não emite.">Revisar e emitir</button>
         </div>
       </div>
@@ -827,7 +827,7 @@ function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
   dlg.innerHTML = `
     <div class="dlg-cab"><h2>Confirme a emissão</h2>${pilulaAmb(estado.amb)}</div>
     <div class="dlg-corpo">
-      <div class="sub" style="margin-bottom:8px">${prod ? "Gera uma NFS-e real, com valor fiscal." : "Ambiente de teste: sem valor fiscal."}</div>
+      <div class="sub" style="margin-bottom:8px">${prod ? "Confira os dados antes de emitir." : "Homologação: a nota é emitida sem validade fiscal."}</div>
       <table><tbody>
         <tr><td>Tomador</td><td>${esc(b.tomaNome)}<div class="muted">${doc(b.tomaDoc)}</div></td></tr>
         <tr><td>E-mail do tomador</td><td>${contato(dados.emailTomador, t.emailTomador)}</td></tr>
@@ -846,12 +846,12 @@ function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
     </div>
     <!-- Fora da área que rola: a confirmação e o resultado ficam sempre à vista, junto dos botões. -->
     <div class="dlg-acao">
-      ${prod ? `<label class="confirmo"><input type="checkbox" id="confirmo"> <span>Confirmo: emitir esta NFS-e <strong>de verdade</strong> para ${esc(b.tomaNome.replace(/\.$/, ""))}.</span></label>` : ""}
+      ${prod ? `<label class="confirmo"><input type="checkbox" id="confirmo"> <span>Confirmo a emissão desta NFS-e para ${esc(b.tomaNome.replace(/\.$/, ""))}.</span></label>` : ""}
       <div id="resultado"></div>
     </div>
     <div class="dlg-rodape">
       <button class="btn sec" id="fechar">Cancelar</button>
-      <button class="btn" id="emitir" ${prod ? "disabled" : ""} title="${prod ? "Envia para a Sefin e gera a NFS-e real. Marque a confirmação para liberar." : "Envia para o ambiente de teste da Sefin."}">Emitir em ${nomeAmb(estado.amb)}</button>
+      <button class="btn" id="emitir" ${prod ? "disabled" : ""} title="${prod ? "Envia a DPS para a Sefin e emite a NFS-e. Marque a confirmação para liberar." : "Envia a DPS para o ambiente de homologação da Sefin."}">${prod ? "Emitir NFS-e" : "Emitir em homologação"}</button>
     </div>`;
   dlg.showModal();
   $("fechar").onclick = () => dlg.close();
