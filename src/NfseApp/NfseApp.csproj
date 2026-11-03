@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>NfseApp-Teste</AssemblyName>
     <RootNamespace>NfseApp</RootNamespace>
-    <Version>0.4.0</Version>
+    <Version>0.4.1</Version>
   </PropertyGroup>
 
   <!-- Edição do dia a dia: dotnet publish -p:SoProducao=true (ver Edicao.cs) -->
