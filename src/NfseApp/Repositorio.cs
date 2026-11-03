@@ -15,7 +15,11 @@ public class Repositorio
     private readonly string _raizDoc;
     private readonly string _dir;
 
-    public static string PastaRaiz => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NfseApp");
+    // NFSEAPP_DADOS troca a pasta (os testes automatizados rodam numa pasta temporária, sem tocar nos dados reais).
+    public static string PastaRaiz =>
+        Environment.GetEnvironmentVariable("NFSEAPP_DADOS") is { Length: > 0 } pasta
+            ? pasta
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NfseApp");
 
     public Repositorio(string documento, Ambiente amb)
     {

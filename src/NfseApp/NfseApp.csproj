@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>NfseApp-Teste</AssemblyName>
     <RootNamespace>NfseApp</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
   </PropertyGroup>
 
   <!-- Edição do dia a dia: dotnet publish -p:SoProducao=true (ver Edicao.cs) -->
@@ -21,6 +21,13 @@
 
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.5" />
+  </ItemGroup>
+
+  <!-- Trimming (tools/build.sh reduzido): o SignedXml cria hash e assinatura pelo nome do algoritmo, via reflexão.
+       Sem preservar essas bibliotecas inteiras, o trimming remove os algoritmos e a assinatura da DPS quebra. -->
+  <ItemGroup Condition="'$(PublishTrimmed)' == 'true'">
+    <TrimmerRootAssembly Include="System.Security.Cryptography" />
+    <TrimmerRootAssembly Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
 
   <!-- A página vai embutida no .exe: um arquivo só para distribuir. -->

@@ -6,7 +6,8 @@ using System.Xml.Linq;
 
 namespace NfseApp;
 
-public record DadosNovaNota(string DCompet, decimal VServ, decimal VDescIncond, string Descricao, decimal? PTotTribSN);
+public record DadosNovaNota(string DCompet, decimal VServ, decimal VDescIncond, string Descricao, decimal? PTotTribSN,
+    string? FoneTomador = null, string? EmailTomador = null);
 
 /// <summary>
 /// Monta uma DPS nova a partir da DPS de uma NFS-e já autorizada ("copiar a última nota"),
@@ -35,8 +36,14 @@ public static class Dps
         var opSimpNac = prest.Element(N + "regTrib")?.Element(N + "opSimpNac")?.Value;
         var simples = opSimpNac is "2" or "3";
 
-        // Homologação não deve mandar e-mail de teste para o cliente de verdade.
-        if (amb.TpAmb == 2) inf.Element(N + "toma")?.Element(N + "email")?.Remove();
+        // Contato do tomador vem da tela (o cliente pode ter mudado). No leiaute, fone e email são os dois últimos campos.
+        if (inf.Element(N + "toma") is { } toma)
+        {
+            toma.Element(N + "fone")?.Remove();
+            toma.Element(N + "email")?.Remove();
+            if (!string.IsNullOrEmpty(dados.FoneTomador)) toma.Add(new XElement(N + "fone", dados.FoneTomador));
+            if (!string.IsNullOrEmpty(dados.EmailTomador)) toma.Add(new XElement(N + "email", dados.EmailTomador));
+        }
 
         inf.Element(N + "serv")!.Element(N + "cServ")!.Element(N + "xDescServ")!.Value = dados.Descricao;
 

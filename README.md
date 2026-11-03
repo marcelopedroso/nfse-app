@@ -64,25 +64,51 @@ Regras de segurança:
 ## Desenvolver
 
 ```bash
-cd src/NfseApp
-OPC="-c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none"
-dotnet publish $OPC -o ../../dist/teste                         # NfseApp-Teste.exe (produção + homologação)
-dotnet publish $OPC -p:SoProducao=true -o ../../dist/producao   # NfseApp.exe (só produção)
+tools/build.sh            # gera as duas versões (~19 MB) e roda a bateria de testes em cada .exe
 ```
+
+`tools/build.sh` só termina com sucesso se todos os testes passarem. **Não publique um `.exe` que não passou por ele.**
+Modos: `reduzido` (padrão, ~19 MB), `comprimido` (~45 MB) e `normal` (~95 MB).
+
+**Por que o `.exe` é grande:** o código do app tem menos de 300 KB. O resto é o .NET, que vai dentro do `.exe`
+para ninguém precisar instalar nada. O modo `reduzido` remove do .NET o que o app não usa (trimming parcial) e
+comprime o resto. O trimming pode remover coisas usadas por reflexão: foi assim que a assinatura do XML quebrou
+na primeira tentativa. Por isso as bibliotecas de criptografia são preservadas no `NfseApp.csproj`, e a bateria
+testa a assinatura nas duas versões.
 
 As diferenças entre as duas versões estão todas em `Edicao.cs`. O ícone é gerado por `tools/gerar_icone.py`.
 
 O app precisa rodar no Windows, porque a chave do certificado não é exportável. No WSL, compile e rode o `.exe`
-pelo interop. A opção `--sem-navegador` sobe sem abrir janela, e um número muda a porta (ex.: `NfseApp.exe 5200`).
-Como é WinExe, ele não mostra erro de inicialização. Para ver o erro, rode
-`./NfseApp.exe --sem-navegador > saida.txt 2>&1`.
+pelo interop. Opções de linha de comando:
+- `--sem-navegador`: sobe sem abrir janela.
+- um número: muda a porta preferida (ex.: `NfseApp.exe 5200`). Se a porta estiver ocupada por outro programa,
+  o app sobe numa livre.
+- `--autoteste saida.xml`: monta e assina uma DPS sem rede e confere a assinatura.
+
+Como é WinExe, ele não mostra erro de inicialização. Para ver o erro, rode `./NfseApp.exe --sem-navegador > saida.txt 2>&1`.
+
+### Testes (`tests/testar.ps1`)
+
+A bateria roda contra o `.exe` de verdade, no Windows, com o certificado instalado, numa pasta de dados temporária
+(`NFSEAPP_DADOS`) e em portas próprias (5290/5291). Ela cobre:
+- inicialização, segurança (403/401) e login;
+- leitura do ADN, notas, tomadores, XML e PDF;
+- proteções de produção;
+- validações dos campos;
+- emissão real em **homologação**, com o XML conferido campo a campo, a DPS validada no XSD oficial e a assinatura verificada;
+- E0014 sem nota em dobro;
+- autoteste de assinatura nas duas versões;
+- instância única e porta ocupada.
+
+Ela **nunca** manda confirmação de produção: os testes de proteção usam uma nota-base inexistente, então mesmo uma
+proteção quebrada pararia antes da Sefin. O único aviso esperado é o PDF quando o ADN está fora do ar.
 
 ### Publicar uma versão
 
-Suba `<Version>` no `NfseApp.csproj`, gere as duas versões e:
+Suba `<Version>` no `NfseApp.csproj`, rode `tools/build.sh` até dar `TUDO OK` e:
 
 ```bash
-gh release create vX.Y.Z dist/producao/NfseApp.exe dist/teste/NfseApp-Teste.exe --title "vX.Y.Z" --notes "..."
+gh release create vX.Y.Z dist/reduzido/producao/NfseApp.exe dist/reduzido/teste/NfseApp-Teste.exe --title "vX.Y.Z" --notes "..."
 ```
 
 Ainda não faz: e-CPF, cancelamento, nota sem uma nota anterior para copiar, e o PDF na homologação (a API

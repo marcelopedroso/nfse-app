@@ -294,7 +294,7 @@ async function telaNova(tomador) {
   } catch (e) { app.innerHTML = mensagem("erro", esc(e.message)); return; }
   const b = info.base, s = info.sugestao, t = info.tributacao;
   const prod = estado.amb === "prod";
-  const emailTomador = info.emailTomadorRemovido ? "não vai na nota de teste (para não chegar ao cliente)" : (t.emailTomador || "nenhum na nota");
+  const contato = (atual, antes) => (atual || "—") + (atual !== (antes || "") && !info.emailTomadorRemovido ? ` <span class="sub">(antes: ${esc(antes || "nenhum")})</span>` : "");
   app.innerHTML = `
     ${info.aviso ? mensagem("erro", esc(info.aviso)) : ""}
     <div class="card">
@@ -311,6 +311,12 @@ async function telaNova(tomador) {
           <input id="vDesc" type="number" step="0.01" min="0" value="${s.vDescIncond}"></div>
         ${info.simples ? `<div><label>% tributos do Simples Nacional ${ajuda("Percentual aproximado de tributos do Simples, exigido pela Lei da Transparência (12.741). É informativo e vem do contador. O app lembra o último valor usado.")}</label>
           <input id="pct" type="number" step="0.01" min="0" value="${s.pTotTribSN ?? ""}" placeholder="pergunte ao contador"></div>` : ""}
+        <div><label>E-mail do tomador ${ajuda(info.emailTomadorRemovido
+            ? "Em homologação o e-mail da nota real não é usado, para o teste não chegar ao cliente. Se quiser, digite um e-mail seu."
+            : "Veio da nota anterior. Se o cliente mudou de e-mail, corrija aqui: a nota nova sai com o e-mail novo e as próximas também.")}</label>
+          <input id="email" type="email" maxlength="80" value="${esc(s.emailTomador)}" placeholder="${info.emailTomadorRemovido ? "opcional: um e-mail seu para testar" : "sem e-mail"}"></div>
+        <div><label>Telefone do tomador ${ajuda("Só números, com DDD (6 a 20 dígitos). Opcional.")}</label>
+          <input id="fone" inputmode="numeric" maxlength="20" value="${esc(s.foneTomador)}" placeholder="sem telefone"></div>
       </div>
       <div style="margin-top:14px"><label>Descrição do serviço ${ajuda("Texto que o tomador lê na nota. Seja específico se o cliente pedir (ex.: mês de referência, contrato).")}</label>
         <textarea id="descricao" rows="2">${esc(s.descricao)}</textarea></div>
@@ -323,7 +329,6 @@ async function telaNova(tomador) {
         <div><span>Regime</span><strong>${esc(t.regime)}</strong></div>
         <div><span>Serviço</span><strong title="${esc(b.xTribNac)}">${esc(b.cTribNac)} · ${esc(b.xTribNac)}</strong></div>
         <div><span>Local da prestação</span><strong>${esc(t.localPrestacao || "—")}</strong></div>
-        <div><span>E-mail do tomador</span><strong>${esc(emailTomador)}</strong></div>
         <div><span>Número ${ajuda("Série e número da DPS (Declaração de Prestação de Serviço). Sequência sua; o app usa o próximo depois do último já autorizado. O número da NFS-e é dado pela Sefin.")}</span><strong>Série ${info.serie} · DPS ${info.proximoNDps}</strong></div>
       </div>
       <div class="linha-acoes"><button class="btn" id="revisar" title="Mostra o resumo para conferir. Ainda não emite.">Revisar</button></div>
@@ -346,7 +351,9 @@ async function telaNova(tomador) {
     const dados = {
       amb: estado.amb, baseChave: b.chave, dCompet: campo("dCompet").value,
       vServ: +campo("vServ").value, vDescIncond: +campo("vDesc").value || 0,
-      descricao: campo("descricao").value, pTotTribSN: info.simples ? (campo("pct").value === "" ? null : +campo("pct").value) : null,
+      descricao: campo("descricao").value,
+      emailTomador: campo("email").value.trim(), foneTomador: campo("fone").value.replace(/\D/g, ""),
+      pTotTribSN: info.simples ? (campo("pct").value === "" ? null : +campo("pct").value) : null,
       confirmoProducao: false,
     };
     campo("revisao").innerHTML = `
@@ -355,7 +362,8 @@ async function telaNova(tomador) {
         <table class="resumo"><tbody>
           <tr><td>Ambiente</td><td><span class="tag ${estado.amb}">${nomeAmb(estado.amb)}</span> ${prod ? "— gera NFS-e real, com valor fiscal" : "— teste, sem valor fiscal"}</td></tr>
           <tr><td>Tomador</td><td>${esc(b.tomaNome)} · ${doc(b.tomaDoc)}</td></tr>
-          <tr><td>E-mail do tomador</td><td>${esc(emailTomador)}</td></tr>
+          <tr><td>E-mail do tomador</td><td>${contato(esc(dados.emailTomador), t.emailTomador)}</td></tr>
+          <tr><td>Telefone do tomador</td><td>${contato(esc(dados.foneTomador), t.foneTomador)}</td></tr>
           <tr><td>Competência</td><td>${data(dados.dCompet)}</td></tr>
           <tr><td>Serviço</td><td>${esc(b.cTribNac)} · ${esc(b.xTribNac)}</td></tr>
           <tr><td>Descrição</td><td>${esc(dados.descricao)}</td></tr>

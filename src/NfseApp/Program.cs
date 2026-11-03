@@ -4,16 +4,30 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using NfseApp;
 
-var porta = args.FirstOrDefault(a => int.TryParse(a, out _)) is { } p ? int.Parse(p) : Edicao.Porta;
+var iAutoteste = Array.IndexOf(args, "--autoteste");
+if (iAutoteste >= 0) return Autoteste.Rodar(args.ElementAtOrDefault(iAutoteste + 1) ?? "autoteste-dps.xml");
+
+var portaPreferida = args.FirstOrDefault(a => int.TryParse(a, out _)) is { } p ? int.Parse(p) : Edicao.Porta;
 var abrirNavegador = !args.Contains("--sem-navegador");
-var url = $"http://127.0.0.1:{porta}";
+
+// Esta edição já está aberta: só abre outra janela para ela.
+if (await Instancia.JaAberta(portaPreferida))
+{
+    Console.WriteLine($"O app já está aberto em http://127.0.0.1:{portaPreferida}");
+    if (abrirNavegador) Janela.Abrir($"http://127.0.0.1:{portaPreferida}");
+    return 0;
+}
+
+// Usa a porta de sempre quando dá (o navegador guarda o tema por porta); se outro programa está nela, o sistema escolhe uma livre.
+var porta = Instancia.PortaLivre(portaPreferida) ? portaPreferida : 0;
 
 // Pasta base fixa na do .exe: aberto de uma pasta de rede (ex.: \\wsl.localhost) o .NET travava vigiando arquivos de configuração.
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
-builder.WebHost.UseUrls(url);
+builder.WebHost.UseUrls($"http://127.0.0.1:{porta}");
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 var app = builder.Build();
 
@@ -34,6 +48,7 @@ app.MapGet("/icone.png", () => Embutido("icone.png", "image/png"));
 
 app.MapGet("/api/info", () => new
 {
+    app = Instancia.Assinatura,
     nome = Edicao.Nome,
     versao = Edicao.Versao,
     temHomologacao = Edicao.TemHomologacao,
@@ -108,6 +123,7 @@ app.MapGet("/api/nova", async (string? amb, string? tomador, HttpContext ctx) =>
               ?? (decimal.TryParse(XDocument.Parse(xmlBase).Descendants(Notas.N + "pTotTribSN").FirstOrDefault()?.Value,
                   NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : null);
 
+    var tributacao = Notas.LerTributacao(xmlBase);
     return Results.Ok(new
     {
         @base = baseNota,
@@ -115,7 +131,7 @@ app.MapGet("/api/nova", async (string? amb, string? tomador, HttpContext ctx) =>
         proximoNDps = ProximoNDps(s.Info, destino, baseNota.Serie),
         serie = baseNota.Serie,
         simples,
-        tributacao = Notas.LerTributacao(xmlBase),
+        tributacao,
         emailTomadorRemovido = destino.TpAmb == 2,
         sugestao = new
         {
@@ -124,6 +140,9 @@ app.MapGet("/api/nova", async (string? amb, string? tomador, HttpContext ctx) =>
             vDescIncond = baseNota.VDesc,
             descricao = baseNota.Descricao,
             pTotTribSN = pct,
+            // Em homologação o e-mail da nota real não vem sugerido, para não chegar ao cliente.
+            emailTomador = destino.TpAmb == 2 ? "" : tributacao.EmailTomador,
+            foneTomador = tributacao.FoneTomador,
         },
         aviso,
     });
@@ -140,6 +159,11 @@ app.MapPost("/api/emitir", async (EmitirReq req, HttpContext ctx) =>
     if (!DateTime.TryParseExact(req.DCompet, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var comp) || comp > DateTime.Today)
         return Erro(400, "Competência inválida (não pode ser futura).");
     if (string.IsNullOrWhiteSpace(req.Descricao)) return Erro(400, "Descrição do serviço é obrigatória.");
+    var email = req.EmailTomador?.Trim() ?? "";
+    if (email != "" && (email.Length > 80 || !Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$")))
+        return Erro(400, "E-mail do tomador inválido.");
+    var fone = Regex.Replace(req.FoneTomador ?? "", @"\D", "");
+    if (fone != "" && fone.Length is < 6 or > 20) return Erro(400, "Telefone do tomador deve ter de 6 a 20 dígitos.");
 
     await SincronizarParaEmitir(s, destino);
     var repoProd = new Repositorio(s.Info.Documento, Ambiente.Producao);
@@ -150,7 +174,11 @@ app.MapPost("/api/emitir", async (EmitirReq req, HttpContext ctx) =>
     string idDps, assinada;
     try
     {
-        var (id, dps) = Dps.Montar(repoProd.Xml(baseNota.Chave)!, new DadosNovaNota(req.DCompet, req.VServ, req.VDescIncond, req.Descricao.Trim(), req.PTotTribSN), destino, nDps);
+        var xmlBase = repoProd.Xml(baseNota.Chave)!;
+        // Homologação nunca usa o e-mail da nota real (só um que a pessoa digitou para testar).
+        if (destino.TpAmb == 2 && email == Notas.LerTributacao(xmlBase).EmailTomador) email = "";
+        var dadosNota = new DadosNovaNota(req.DCompet, req.VServ, req.VDescIncond, req.Descricao.Trim(), req.PTotTribSN, fone, email);
+        var (id, dps) = Dps.Montar(xmlBase, dadosNota, destino, nDps);
         idDps = id;
         assinada = Dps.Assinar(dps, id, s.Cert);
     }
@@ -202,6 +230,8 @@ app.MapGet("/api/notas/{chave}/pdf", async (string chave, string? amb, HttpConte
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
+    // Com porta 0, só depois de subir dá para saber qual porta o sistema escolheu.
+    var url = app.Urls.First();
     Console.WriteLine($"NFS-e rodando em {url}");
     if (!abrirNavegador || Janela.Abrir(url) is not { } janela) return;
     // Fechar a janela encerra o app. Se o Edge devolveu o controle na hora (repassou para uma janela já aberta), o app segue no ar.
@@ -214,12 +244,13 @@ app.Lifetime.ApplicationStarted.Register(() =>
 });
 
 try { app.Run(); }
-catch (IOException)
+catch (IOException e)
 {
-    // Já tem uma instância aberta nessa porta: só abre outra janela para ela.
-    Console.WriteLine($"O app já está aberto em {url}.");
-    if (abrirNavegador) Janela.Abrir(url);
+    // Só acontece se outro programa pegar a porta entre a checagem e a abertura.
+    Console.WriteLine($"Não consegui abrir a porta {porta}: {e.Message}");
+    return 1;
 }
+return 0;
 
 // ---------------------------------------------------------------------------------------------
 
@@ -282,4 +313,5 @@ static IResult Erro(int status, string mensagem) => Results.Json(new { erro = me
 
 record Sess(X509Certificate2 Cert, CertInfo Info);
 record LoginReq(string Thumbprint);
-record EmitirReq(string Amb, string BaseChave, string DCompet, decimal VServ, decimal VDescIncond, string Descricao, decimal? PTotTribSN, bool ConfirmoProducao);
+record EmitirReq(string Amb, string BaseChave, string DCompet, decimal VServ, decimal VDescIncond, string Descricao, decimal? PTotTribSN, bool ConfirmoProducao,
+    string? EmailTomador = null, string? FoneTomador = null);

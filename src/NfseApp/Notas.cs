@@ -12,7 +12,7 @@ public record Nota(
 public record Tomador(string Documento, string Nome, string Email, int Notas, decimal Total, string UltimaData, long UltimoNumero, decimal UltimoValor);
 
 /// <summary>O que a nota nova herda da nota-base e a tela precisa mostrar antes de emitir.</summary>
-public record Tributacao(string Regime, bool IssRetido, decimal? PAliqPis, decimal? PAliqCofins, string EmailTomador, string LocalPrestacao);
+public record Tributacao(string Regime, bool IssRetido, decimal? PAliqPis, decimal? PAliqCofins, string EmailTomador, string FoneTomador, string LocalPrestacao);
 
 public static class Notas
 {
@@ -91,6 +91,7 @@ public static class Notas
             Pct("pAliqPis"),
             Pct("pAliqCofins"),
             Txt(dps.Element(N + "toma")?.Element(N + "email")),
+            Txt(dps.Element(N + "toma")?.Element(N + "fone")),
             Txt(inf.Element(N + "xLocPrestacao")));
     }
 
