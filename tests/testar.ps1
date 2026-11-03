@@ -210,10 +210,28 @@ try {
     Ok 'próximo número de DPS = maior usado + 1' ($nova.proximoNDps -eq $maiorDps + 1) "$($nova.proximoNDps) vs $maiorDps"
     Ok 'traz a tributação da nota-base' ($null -ne $nova.tributacao -and $nova.tributacao.regime)
 
-    $r = Chamar $cli GET "$base/api/notas/$($validas[0].chave)/pdf?amb=prod"
-    if ($r.Status -eq 200) { Ok 'PDF (DANFSe) é um PDF' ($r.Bytes.Length -gt 100 -and [Text.Encoding]::ASCII.GetString($r.Bytes, 0, 5) -eq '%PDF-') }
-    elseif ($r.Status -eq 502) { Aviso "PDF indisponível no ADN agora (o app respondeu certo: $($r.Texto))" }
-    else { Ok 'PDF responde' $false "HTTP $($r.Status)" }
+
+    # ------------------------------------------------------------------ DANFSe
+    Secao 'DANFSe gerado pelo app (NT 008/2026; a API nacional foi suspensa em 03/08/2026)'
+    $nv = $validas[0]
+    $r = Chamar $cli GET "$base/api/notas/$($nv.chave)/danfse?amb=prod"
+    $html = [Net.WebUtility]::HtmlDecode($r.Texto)
+    Ok 'DANFSe (HTML) é gerado' ($r.Status -eq 200 -and $html -match 'DANFSe v2\.0' -and $html -match 'Documento Auxiliar da NFS-e')
+    Ok 'traz a chave, o número e o tomador' ($html.Contains($nv.chave) -and $html.Contains(">$($nv.numero)<") -and $html.Contains($nv.tomaNome))
+    Ok 'QR Code aponta para a consulta pública da chave' ($html -match '<svg' -and $html.Contains("data-qr=`"https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=$($nv.chave)`""))
+    Ok 'linha obrigatória de totais aproximados de tributos' ($html.Contains('Totais Aproximados dos Tributos cfe. Lei nº 12.741/2012'))
+    Ok 'nota de produção não leva aviso de homologação' (-not $html.Contains('SEM VALIDADE'))
+    Ok 'nota válida sem marca d''água' (-not $html.Contains('class="marca"'))
+    if ($canceladas.Count -gt 0) {
+        $hc = [Net.WebUtility]::HtmlDecode((Chamar $cli GET "$base/api/notas/$($canceladas[0].chave)/danfse?amb=prod").Texto)
+        Ok 'nota cancelada sai com marca d''água CANCELADA' ($hc.Contains('class="marca">CANCELADA<'))
+    }
+    $r = Chamar $cli GET "$base/api/notas/$($nv.chave)/pdf?amb=prod"
+    $pdfTexto = [Text.Encoding]::ASCII.GetString($r.Bytes)
+    Ok 'PDF gerado pelo Edge' ($r.Status -eq 200 -and $r.Tipo -match 'pdf' -and $pdfTexto.StartsWith('%PDF-')) "HTTP $($r.Status) $($r.Tipo) $($r.Texto)"
+    $paginas = ([regex]::Matches($pdfTexto, '/Count (\d+)') | ForEach-Object { [int]$_.Groups[1].Value } | Measure-Object -Maximum).Maximum
+    Ok 'PDF tem uma página só (NT 008, item 2.2)' ($paginas -eq 1) "páginas: $paginas"
+    Ok 'PDF em A4 retrato' ($pdfTexto -match '/MediaBox \[0 0 59[45]\.\d+ 84[12]\.\d+\]')
 
     # ------------------------------------------------------------------ assinatura sem rede
     Secao 'Assinatura sem rede (autoteste do .exe, nas duas edições)'
@@ -291,6 +309,10 @@ try {
         Ok 'XML: e-mail e telefone do tomador editados' ((Tomador $nf 'email') -eq 'teste.nfseapp@example.com' -and (Tomador $nf 'fone') -eq '42999990000') "$(Tomador $nf 'email') / $(Tomador $nf 'fone')"
         Ok 'XML: descrição e competência' ((Valor $nf 'xDescServ') -eq $valido.descricao -and (Valor $nf 'dCompet') -eq $hoje)
         Ok 'XML: valor líquido' ((Valor $nf 'vLiq') -eq '1134.56') (Valor $nf 'vLiq')
+
+        $hh = [Net.WebUtility]::HtmlDecode((Chamar $cli GET "$base/api/notas/$($e1.chave)/danfse?amb=hom").Texto)
+        Ok 'DANFSe de homologação: "NFS-e SEM VALIDADE JURÍDICA"' ($hh.Contains('NFS-e SEM VALIDADE JURÍDICA') -and $hh.Contains('Tipo de Ambiente: Homologação'))
+        Ok 'DANFSe mostra o e-mail editado e o valor' ($hh.Contains('teste.nfseapp@example.com') -and $hh.Contains('R$ 1.234,56'))
 
         $dps = Get-ChildItem "$pastaHom\dps" -Filter "*$('{0:D15}' -f [int64]$e1.nDps).xml" | Select-Object -First 1
         Ok 'DPS assinada foi guardada' ($null -ne $dps)

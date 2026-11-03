@@ -99,15 +99,6 @@ public class ApiNacional
         return Texto(json.RootElement, "nfseXmlGZipB64") is { } gz ? Descompactar(gz) : null;
     }
 
-    public async Task<byte[]> Danfse(Ambiente amb, string chave)
-    {
-        using var resp = await ComRetentativa(() => _http.GetAsync($"{amb.Adn}/danfse/{chave}"));
-        var bytes = await resp.Content.ReadAsByteArrayAsync();
-        if (!resp.IsSuccessStatusCode || bytes.Length < 5 || Encoding.ASCII.GetString(bytes, 0, 5) != "%PDF-")
-            throw new InvalidOperationException($"O PDF não está disponível agora (ADN respondeu {(int)resp.StatusCode}). Tente de novo mais tarde.");
-        return bytes;
-    }
-
     // O ADN às vezes derruba a conexão; uma segunda tentativa costuma passar.
     private static async Task<HttpResponseMessage> ComRetentativa(Func<Task<HttpResponseMessage>> chamada)
     {

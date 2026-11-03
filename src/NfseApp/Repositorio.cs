@@ -77,6 +77,18 @@ public class Repositorio
             .ToList();
     }
 
+    /// <summary>Marca d'água do DANFSe (NT 008, item 2.5): CANCELADA (e101101) ou SUBSTITUÍDA (e105102).</summary>
+    public string? MarcaDagua(string chave)
+    {
+        foreach (var f in Directory.EnumerateFiles(Path.Combine(_dir, "eventos"), $"*_{Path.GetFileName(chave)}.xml"))
+        {
+            var xml = File.ReadAllText(f);
+            if (xml.Contains("<e105102")) return "SUBSTITUÍDA";
+            if (xml.Contains("<e101101")) return "CANCELADA";
+        }
+        return null;
+    }
+
     public string? Xml(string chave)
     {
         var f = Path.Combine(_dir, "nfse", $"{Path.GetFileName(chave)}.xml");

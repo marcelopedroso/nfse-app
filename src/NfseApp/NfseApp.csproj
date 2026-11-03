@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>NfseApp-Teste</AssemblyName>
     <RootNamespace>NfseApp</RootNamespace>
-    <Version>0.4.1</Version>
+    <Version>0.5.0</Version>
   </PropertyGroup>
 
   <!-- Edição do dia a dia: dotnet publish -p:SoProducao=true (ver Edicao.cs) -->
@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.5" />
+    <!-- QR Code do DANFSe (NT 008/2026). MIT. -->
+    <PackageReference Include="QRCoder" Version="1.8.1" />
   </ItemGroup>
 
   <!-- Trimming (tools/build.sh reduzido): o SignedXml cria hash e assinatura pelo nome do algoritmo, via reflexão.
@@ -34,6 +36,8 @@
   <ItemGroup>
     <Content Remove="wwwroot\**" />
     <EmbeddedResource Include="wwwroot\**" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- DANFSe: tabela de municípios do IBGE (tools/gerar_municipios.py) e logo oficial da NFS-e (gov.br/nfse). -->
+    <EmbeddedResource Include="assets\municipios.csv;assets\logo-nfse.png" LogicalName="assets/%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

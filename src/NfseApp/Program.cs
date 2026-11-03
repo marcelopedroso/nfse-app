@@ -221,11 +221,30 @@ app.MapGet("/api/notas/{chave}/xml", (string chave, string? amb, HttpContext ctx
     return xml == null ? Erro(404, "Nota não encontrada.") : Results.File(Encoding.UTF8.GetBytes(xml), "application/xml", $"NFSe_{chave}.xml");
 });
 
+// DANFSe gerado pelo app (a API nacional de PDF foi suspensa em 03/08/2026, NT 008/2026). Sem rede: só o XML guardado.
+app.MapGet("/api/notas/{chave}/danfse", (string chave, string? amb, HttpContext ctx) =>
+{
+    if (Sessao(ctx) is not { } s) return Erro(401, "Não logado.");
+    var repo = new Repositorio(s.Info.Documento, Ambiente.De(amb));
+    return repo.Xml(chave) is { } xml
+        ? Results.Text(Danfse.Html(xml, repo.MarcaDagua(chave)), "text/html; charset=utf-8")
+        : Erro(404, "Nota não encontrada.");
+});
+
 app.MapGet("/api/notas/{chave}/pdf", async (string chave, string? amb, HttpContext ctx) =>
 {
     if (Sessao(ctx) is not { } s) return Erro(401, "Não logado.");
-    try { return Results.File(await new ApiNacional(s.Cert).Danfse(Ambiente.De(amb), chave), "application/pdf", $"DANFSe_{chave}.pdf"); }
-    catch (Exception e) { return Results.Text(e.Message, "text/plain; charset=utf-8", statusCode: 502); }
+    var repo = new Repositorio(s.Info.Documento, Ambiente.De(amb));
+    if (repo.Xml(chave) is not { } xml) return Erro(404, "Nota não encontrada.");
+    var html = Danfse.Html(xml, repo.MarcaDagua(chave));
+    try
+    {
+        // Sem Edge na máquina: devolve o HTML do DANFSe, que dá para imprimir em PDF pelo navegador.
+        if (await Danfse.Pdf(html) is not { } pdf) return Results.Text(html, "text/html; charset=utf-8");
+        ctx.Response.Headers.ContentDisposition = $"inline; filename=\"DANFSe_{chave}.pdf\"";
+        return Results.File(pdf, "application/pdf");
+    }
+    catch (Exception e) { return Results.Text("Não consegui gerar o PDF: " + e.Message, "text/plain; charset=utf-8", statusCode: 500); }
 });
 
 app.Lifetime.ApplicationStarted.Register(() =>

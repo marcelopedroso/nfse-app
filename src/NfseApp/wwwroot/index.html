@@ -636,7 +636,7 @@ function tabelaNotas(lista, filtro, comTotais) {
             : `<span class="pilula ok" title="Autorizada pela Sefin e válida">Autorizada</span>`}</td>
           <td class="acoes">
             <a class="btn sec icone" href="/api/notas/${n.chave}/xml?amb=${estado.amb}" title="Baixar o XML oficial da nota (o documento fiscal em si)">${icone("baixar")} XML</a>
-            <a class="btn sec icone" href="/api/notas/${n.chave}/pdf?amb=${estado.amb}" target="_blank" title="Abrir o DANFSe: o PDF da nota, gerado pelo Ambiente Nacional">${icone("pdf")} PDF</a>
+            <a class="btn sec icone" href="/api/notas/${n.chave}/pdf?amb=${estado.amb}" target="_blank" title="Gerar o DANFSe (PDF) no modelo oficial da NT 008/2026. Leva alguns segundos.">${icone("pdf")} PDF</a>
           </td>
         </tr>`).join("")}
       </tbody>

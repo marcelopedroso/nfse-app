@@ -11,10 +11,12 @@ public static class Janela
         @"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     };
 
+    public static string? CaminhoEdge() => CaminhosEdge.FirstOrDefault(File.Exists);
+
     /// <summary>Devolve o processo da janela, ou null se caiu no navegador padrão (sem Edge).</summary>
     public static Process? Abrir(string url)
     {
-        if (CaminhosEdge.FirstOrDefault(File.Exists) is not { } edge)
+        if (CaminhoEdge() is not { } edge)
         {
             AbrirNavegador(url);
             return null;

@@ -92,7 +92,8 @@ Como é WinExe, ele não mostra erro de inicialização. Para ver o erro, rode `
 A bateria roda contra o `.exe` de verdade, no Windows, com o certificado instalado, numa pasta de dados temporária
 (`NFSEAPP_DADOS`) e em portas próprias (5290/5291). Ela cobre:
 - inicialização, segurança (403/401) e login;
-- leitura do ADN, notas, tomadores, XML e PDF;
+- leitura do ADN, notas, tomadores e XML;
+- DANFSe: conteúdo, QR Code, marca d'água, aviso de homologação, PDF de 1 página A4;
 - proteções de produção;
 - validações dos campos;
 - emissão real em **homologação**, com o XML conferido campo a campo, a DPS validada no XSD oficial e a assinatura verificada;
@@ -101,7 +102,7 @@ A bateria roda contra o `.exe` de verdade, no Windows, com o certificado instala
 - instância única e porta ocupada.
 
 Ela **nunca** manda confirmação de produção: os testes de proteção usam uma nota-base inexistente, então mesmo uma
-proteção quebrada pararia antes da Sefin. O único aviso esperado é o PDF quando o ADN está fora do ar.
+proteção quebrada pararia antes da Sefin.
 
 ### Publicar uma versão
 
@@ -111,5 +112,21 @@ Suba `<Version>` no `NfseApp.csproj`, rode `tools/build.sh` até dar `TUDO OK` e
 gh release create vX.Y.Z dist/reduzido/producao/NfseApp.exe dist/reduzido/teste/NfseApp-Teste.exe --title "vX.Y.Z" --notes "..."
 ```
 
-Ainda não faz: e-CPF, cancelamento, nota sem uma nota anterior para copiar, e o PDF na homologação (a API
-responde 501 lá). Em produção o PDF vem do ADN (`/danfse/{chave}`), que estava fora do ar (503) no dia do teste.
+### PDF da nota (DANFSe)
+
+A Receita suspendeu a API nacional de DANFSe em 03/08/2026
+([NT 008/2026 SE/CGNFS-e, v1.02](https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica/rtc/nt-008-se-cgnfse-danfse-20260714-v1-02.pdf)).
+Desde então, o sistema emissor é quem gera o DANFSe. O app gera localmente, sem rede, a partir do XML guardado
+(`Danfse.cs`), seguindo o modelo do Anexo I da nota:
+- A4, uma página, com as medidas, fontes e sombreamentos do item 2.4;
+- só o que está no XML; campo sem informação sai como "-" (nota 12);
+- QR Code apontando para a consulta pública da chave, gerado com a biblioteca QRCoder;
+- "NFS-e SEM VALIDADE JURÍDICA" em homologação, e marca d'água CANCELADA ou SUBSTITUÍDA;
+- nome do município pela tabela do IBGE (`assets/municipios.csv`, gerada por `tools/gerar_municipios.py`);
+- logo oficial da NFS-e (`assets/logo-nfse.png`).
+
+O PDF é impresso pelo próprio Edge em modo headless. Sem Edge na máquina, o app devolve o HTML para imprimir pelo navegador.
+Para notas do Simples (`pTotTribSN`) ou sem total de tributos (`indTotTrib`), que a nota técnica não prevê na
+linha de "Totais Aproximados", o app mostra o que o XML traz.
+
+Ainda não faz: e-CPF, cancelamento e nota sem uma nota anterior para copiar.
