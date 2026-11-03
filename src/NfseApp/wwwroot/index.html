@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NFS-e</title>
 <link rel="icon" href="/icone.png">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#121418">
 <script>
   // Aplica o tema antes de pintar a página, para não piscar claro → escuro.
   (() => {
@@ -18,92 +18,279 @@
 <style>
   :root {
     color-scheme: light;
-    --bg: #f4f6fa; --card: #ffffff; --txt: #172033; --sub: #5d6880; --linha: #e2e7ef; --campo: #f7f9fc;
-    --pri: #2563eb; --pri-hover: #1d4ed8; --pri-txt: #fff; --ok: #15803d; --erro: #b42318; --prod: #c2410c; --hom: #a16207;
-    --sombra: 0 1px 2px rgb(16 24 40 / .05), 0 1px 3px rgb(16 24 40 / .06);
+    --bg: #f4f4f2; --card: #ffffff; --txt: #16171a; --sub: #5f6168; --muted: #8a8c93; --linha: #e6e5e1; --campo: #fafaf8;
+    --btn: #1f66c2; --btn-hover: #1a56a5; --btn-txt: #ffffff; --link: #1f66c2; --serie: #2a78d6;
+    --ok: #157f3c; --ok-fundo: #e8f5ec; --erro: #b42318; --erro-fundo: #fdecea; --hom: #9a6200; --hom-fundo: #fdf3dc;
+    --sombra: 0 1px 2px rgb(20 20 20 / .04), 0 2px 8px rgb(20 20 20 / .04);
+    /* A barra lateral é escura nos dois temas. */
+    --lat: #121418; --lat-txt: #e9eaec; --lat-sub: #8e939c; --lat-ativo: #20242b; --lat-linha: #262a31;
   }
   :root[data-tema="escuro"] {
     color-scheme: dark;
-    --bg: #0f1420; --card: #171e2c; --txt: #e7ebf3; --sub: #94a0b8; --linha: #263045; --campo: #111827;
-    --pri: #5b8cff; --pri-hover: #7aa2ff; --pri-txt: #0b1220; --ok: #4ade80; --erro: #f87171; --prod: #fb923c; --hom: #facc15;
-    --sombra: 0 1px 2px rgb(0 0 0 / .3);
+    --bg: #0e0f12; --card: #17191e; --txt: #ecedef; --sub: #a4a7ae; --muted: #7d8189; --linha: #262930; --campo: #121418;
+    --btn: #2f74d0; --btn-hover: #4384dc; --btn-txt: #ffffff; --link: #6aa5f0; --serie: #3987e5;
+    --ok: #4cc27a; --ok-fundo: #12291b; --erro: #f17a6c; --erro-fundo: #2f1614; --hom: #e3b341; --hom-fundo: #2b2310;
+    --sombra: 0 1px 2px rgb(0 0 0 / .35);
+    --lat: #0a0b0d; --lat-ativo: #1a1d22; --lat-linha: #1d2026;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--txt); transition: background .2s, color .2s; }
-  header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--linha); flex-wrap: wrap; }
-  header h1 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
-  header h1 img { width: 26px; height: 26px; }
-  #tema { background: none; border: 1px solid var(--linha); color: var(--sub); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
-  #tema:hover { color: var(--txt); border-color: var(--sub); }
-  nav { display: flex; gap: 4px; }
-  nav button { background: none; border: 0; padding: 8px 12px; border-radius: 6px; color: var(--sub); cursor: pointer; font: inherit; }
-  nav button.ativo { background: var(--bg); color: var(--txt); font-weight: 600; }
-  .direita { margin-left: auto; display: flex; align-items: center; gap: 12px; color: var(--sub); }
-  main { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
-  .card { background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: var(--sombra); }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--linha); vertical-align: top; }
-  th { color: var(--sub); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  tr.cancelada td { color: var(--sub); text-decoration: line-through; }
-  tr.cancelada td.acoes, tr.cancelada td.sit { text-decoration: none; }
-  .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid currentColor; }
-  .tag.prod { color: var(--prod); } .tag.hom { color: var(--hom); } .tag.ok { color: var(--ok); } .tag.canc { color: var(--erro); }
-  button.btn, a.btn { background: var(--pri); color: var(--pri-txt); border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 600; text-decoration: none; display: inline-block; white-space: nowrap; }
-  button.btn:hover:not(:disabled), a.btn:hover { background: var(--pri-hover); }
-  button.sec, a.sec { background: none; color: var(--pri); border: 1px solid var(--linha); padding: 4px 10px; font-weight: 500; }
-  button.sec:hover:not(:disabled), a.sec:hover { background: none; border-color: var(--pri); }
-  button:disabled { opacity: .5; cursor: default; }
-  select, input, textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--linha); border-radius: 8px; background: var(--campo); color: var(--txt); width: 100%; }
-  select:focus, input:focus, textarea:focus { outline: 2px solid var(--pri); outline-offset: -1px; }
-  label { display: block; color: var(--sub); font-size: 12px; margin-bottom: 4px; }
-  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
-  .linha-acoes { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
-  .msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; border: 1px solid; }
-  .msg.erro { color: var(--erro); } .msg.ok { color: var(--ok); } .msg.info { color: var(--sub); }
-  .sub { color: var(--sub); }
-  .certs { display: grid; gap: 10px; }
-  .cert { text-align: left; background: var(--card); border: 1px solid var(--linha); border-radius: 10px; padding: 14px; cursor: pointer; font: inherit; color: inherit; }
-  .cert:hover { border-color: var(--pri); }
-  .resumo td:first-child { color: var(--sub); width: 40%; }
-  .rolagem { overflow-x: auto; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--txt); }
+  h1, h2, h3, .numero-grande { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--link); }
   .oculto { display: none !important; }
-  .ajuda { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 4px; border-radius: 50%;
-           border: 1px solid var(--sub); color: var(--sub); font-size: 10px; font-weight: 600; cursor: help; vertical-align: 1px; }
-  th[title] { cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
-  .heranca { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 18px; margin-top: 16px;
-             padding: 12px 14px; border: 1px dashed var(--linha); border-radius: 10px; }
-  .heranca > div > span { display: block; color: var(--sub); font-size: 12px; }
-  footer { max-width: 1100px; margin: 0 auto 24px; padding: 0 16px; color: var(--sub); font-size: 12px; }
-  footer code { font-family: inherit; background: var(--card); border: 1px solid var(--linha); border-radius: 4px; padding: 0 4px; }
+  .sub { color: var(--sub); }
+  .muted { color: var(--muted); }
+  svg.ic { width: 16px; height: 16px; flex: none; }
+
+  /* ---------- estrutura ---------- */
+  .shell { display: flex; min-height: 100%; }
+  .lateral { width: 232px; flex: none; background: var(--lat); color: var(--lat-txt); display: flex; flex-direction: column;
+             padding: 18px 14px; position: sticky; top: 0; height: 100vh; }
+  .marca { display: flex; align-items: center; gap: 10px; padding: 2px 8px 18px; font-weight: 600; font-size: 15px; }
+  .marca img { width: 26px; height: 26px; }
+  .selo-edicao { font-size: 10px; font-weight: 700; letter-spacing: .06em; color: var(--lat-txt); background: var(--lat-ativo);
+                 border: 1px solid var(--lat-linha); border-radius: 4px; padding: 1px 6px; }
+  .btn-nova { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-bottom: 18px;
+              background: var(--btn); color: var(--btn-txt); border: 0; border-radius: 8px; padding: 9px 12px; font-weight: 600; cursor: pointer; }
+  .btn-nova:hover { background: var(--btn-hover); }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav button { display: flex; align-items: center; gap: 10px; background: none; border: 0; color: var(--lat-sub); text-align: left;
+                padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+  .nav button:hover { color: var(--lat-txt); background: var(--lat-ativo); }
+  .nav button.ativo { color: var(--lat-txt); background: var(--lat-ativo); font-weight: 600; }
+  .rodape-lat { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 16px; border-top: 1px solid var(--lat-linha); }
+  .rotulo-lat { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--lat-sub); margin-bottom: 6px; }
+  .segmentado { display: grid; grid-template-columns: 1fr 1fr; background: var(--lat-ativo); border-radius: 8px; padding: 3px; gap: 3px; }
+  .segmentado button { border: 0; background: none; color: var(--lat-sub); padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
+  .segmentado button.ativo { background: var(--lat); color: var(--lat-txt); font-weight: 600; box-shadow: 0 0 0 1px var(--lat-linha); }
+  .amb-fixo { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+  .ponto.hom { background: var(--hom); }
+  .cert-lat { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+            background: var(--lat-ativo); color: var(--lat-txt); border: 1px solid var(--lat-linha); flex: none; }
+  .cert-lat .nome { font-size: 13px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+  .cert-lat .doc { font-size: 11.5px; color: var(--lat-sub); }
+  .acoes-lat { display: flex; gap: 6px; }
+  .acoes-lat button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: none; color: var(--lat-sub);
+                      border: 1px solid var(--lat-linha); border-radius: 7px; padding: 6px; cursor: pointer; font-size: 12.5px; }
+  .acoes-lat button:hover { color: var(--lat-txt); border-color: var(--lat-sub); }
+  .versao-lat { font-size: 11px; color: var(--lat-sub); cursor: help; }
+
+  main { flex: 1; min-width: 0; padding: 30px 36px 48px; }
+  .conteudo { max-width: 1120px; margin: 0 auto; }
+  .cabecalho { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+  .cabecalho h1 { font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .cabecalho .sub { margin-top: 2px; }
+  .cabecalho .direita { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  .card { background: var(--card); border: 1px solid var(--linha); border-radius: 12px; box-shadow: var(--sombra); }
+  .card-corpo { padding: 20px 22px; }
+  .card-titulo { display: flex; align-items: baseline; gap: 10px; padding: 16px 22px 0; }
+  .card-titulo h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .card-titulo .direita { margin-left: auto; }
+
+  /* ---------- botões e campos ---------- */
+  .btn { display: inline-flex; align-items: center; gap: 7px; background: var(--btn); color: var(--btn-txt); border: 0; border-radius: 8px;
+         padding: 8px 14px; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .btn:hover:not(:disabled) { background: var(--btn-hover); }
+  .btn.sec { background: var(--card); color: var(--txt); border: 1px solid var(--linha); font-weight: 500; }
+  .btn.sec:hover:not(:disabled) { background: var(--campo); border-color: var(--muted); }
+  .btn.icone { padding: 6px 8px; font-weight: 500; font-size: 12.5px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  label.campo { display: block; }
+  label.campo > span { display: block; font-size: 12.5px; color: var(--sub); margin-bottom: 5px; font-weight: 500; }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--campo); }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--btn); outline-offset: -1px; background: var(--card); }
+  textarea { resize: vertical; }
+  .ajuda { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 4px; border-radius: 50%; vertical-align: 1px;
+           border: 1px solid var(--muted); color: var(--muted); font-size: 10px; font-weight: 700; cursor: help; }
+  .pilula { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+  .pilula.ok { color: var(--ok); background: var(--ok-fundo); }
+  .pilula.canc { color: var(--erro); background: var(--erro-fundo); }
+  .pilula.hom { color: var(--hom); background: var(--hom-fundo); }
+  .pilula.prod { color: var(--ok); background: var(--ok-fundo); }
+  .msg { padding: 11px 14px; border-radius: 10px; margin-bottom: 16px; border: 1px solid; font-size: 13.5px; }
+  .msg.erro { color: var(--erro); background: var(--erro-fundo); border-color: transparent; }
+  .msg.ok { color: var(--ok); background: var(--ok-fundo); border-color: transparent; }
+  .msg.info { color: var(--sub); background: var(--card); border-color: var(--linha); }
+
+  /* ---------- início ---------- */
+  .heroi { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .tile { padding: 18px 20px; }
+  .tile .rotulo { font-size: 12.5px; color: var(--sub); font-weight: 500; }
+  .tile .valor { font-size: 22px; font-weight: 600; margin-top: 6px; letter-spacing: -.01em; }
+  .tile .detalhe { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .tile.principal .valor { font-size: 40px; line-height: 1.1; }
+  .duas-colunas { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .proxima { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+  .proxima .tomador { font-size: 16px; font-weight: 600; }
+  .grafico { position: relative; padding: 8px 22px 16px; }
+  .grafico svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .grafico .barra { fill: var(--serie); }
+  .grafico .barra-alvo { fill: transparent; cursor: default; outline: none; }
+  .grafico .barra-alvo:focus-visible { stroke: var(--btn); stroke-width: 1.5; }
+  .grafico .grade { stroke: var(--linha); stroke-width: 1; }
+  .grafico .base { stroke: var(--muted); stroke-width: 1; }
+  .grafico text { fill: var(--sub); font-size: 11px; }
+  .grafico text.valor-barra { fill: var(--txt); font-weight: 600; }
+  .tooltip { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--linha); border-radius: 8px;
+             box-shadow: 0 4px 16px rgb(0 0 0 / .12); padding: 8px 10px; font-size: 12.5px; white-space: nowrap; transform: translate(-50%, -100%); }
+  .tooltip strong { display: block; font-size: 14px; }
+  details.tabela-grafico { padding: 0 22px 16px; font-size: 12.5px; color: var(--sub); }
+  details.tabela-grafico summary { cursor: pointer; }
+
+  /* ---------- listas ---------- */
+  table.lista { width: 100%; border-collapse: collapse; }
+  table.lista th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+                   padding: 12px 14px; border-bottom: 1px solid var(--linha); }
+  table.lista td { padding: 12px 14px; border-bottom: 1px solid var(--linha); vertical-align: middle; }
+  table.lista tbody tr:hover { background: var(--campo); }
+  table.lista tbody tr:last-child td { border-bottom: 0; }
+  table.lista .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.lista .nnota { font-variant-numeric: tabular-nums; font-weight: 600; }
+  table.lista tfoot td { border-top: 1px solid var(--linha); border-bottom: 0; font-weight: 600; background: var(--campo); }
+  th[title] { cursor: help; }
+  tr.cancelada td:not(.sit):not(.acoes) { color: var(--muted); }
+  tr.cancelada .valor-cancelado { text-decoration: line-through; }
+  .nome-doc .doc { font-size: 12px; color: var(--muted); }
+  .acoes { white-space: nowrap; text-align: right; }
+  .barra-ferramentas { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid var(--linha); flex-wrap: wrap; }
+  .chips { display: inline-flex; background: var(--campo); border: 1px solid var(--linha); border-radius: 8px; padding: 2px; }
+  .chips button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--sub); }
+  .chips button.ativo { background: var(--card); color: var(--txt); font-weight: 600; box-shadow: var(--sombra); }
+  .busca { position: relative; flex: 1; max-width: 320px; }
+  .busca input { padding-left: 32px; }
+  .busca svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .iniciais { width: 34px; height: 34px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12px; font-weight: 700;
+              background: var(--campo); border: 1px solid var(--linha); color: var(--sub); }
+  .vazio { padding: 36px; text-align: center; color: var(--sub); }
+
+  /* ---------- nova nota ---------- */
+  .nova { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .secao { padding: 20px 22px; border-bottom: 1px solid var(--linha); }
+  .secao:last-child { border-bottom: 0; }
+  .secao h3 { font-size: 13px; font-weight: 600; margin: 0 0 14px; color: var(--txt); }
+  .grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .grade .inteiro { grid-column: 1 / -1; }
+  .origem { display: flex; gap: 10px; align-items: center; padding: 12px 22px; background: var(--campo); border-bottom: 1px solid var(--linha);
+            border-radius: 12px 12px 0 0; font-size: 13px; color: var(--sub); }
+  .resumo { position: sticky; top: 20px; }
+  .resumo .linha { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .resumo .linha span:last-child { font-variant-numeric: tabular-nums; }
+  .resumo .total { border-top: 1px solid var(--linha); margin-top: 8px; padding-top: 14px; }
+  .resumo .total .numero-grande { font-size: 30px; font-weight: 600; letter-spacing: -.01em; }
+  .resumo .meta { font-size: 12.5px; color: var(--muted); margin: 12px 0 16px; line-height: 1.6; }
+  .resumo .btn { width: 100%; justify-content: center; padding: 10px; }
+  .herdado { font-size: 12.5px; color: var(--sub); line-height: 1.7; }
+  .herdado b { color: var(--txt); font-weight: 600; }
+
+  dialog { border: 1px solid var(--linha); border-radius: 14px; padding: 0; width: min(560px, 92vw); background: var(--card); color: var(--txt);
+           box-shadow: 0 20px 60px rgb(0 0 0 / .25); }
+  dialog::backdrop { background: rgb(10 12 16 / .55); }
+  .dlg-cab { padding: 18px 22px 6px; display: flex; align-items: center; gap: 10px; }
+  .dlg-cab h2 { margin: 0; font-size: 18px; font-weight: 600; }
+  .dlg-corpo { padding: 8px 22px 6px; max-height: 52vh; overflow: auto; }
+  .dlg-corpo table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .dlg-corpo td { padding: 6px 0; border-bottom: 1px solid var(--linha); vertical-align: top; }
+  .dlg-acao { padding: 0 22px; }
+  .dlg-acao .msg { margin: 12px 0 0; }
+  .dlg-corpo td:first-child { color: var(--sub); width: 44%; padding-right: 10px; }
+  .dlg-corpo tr.destaque td { font-weight: 700; font-size: 15px; border-bottom: 0; padding-top: 12px; }
+  .dlg-rodape { padding: 14px 22px 18px; display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+  .confirmo { display: flex; gap: 9px; align-items: flex-start; padding: 12px 14px; margin: 12px 0 4px; border-radius: 10px;
+              background: var(--erro-fundo); color: var(--txt); font-size: 13.5px; cursor: pointer; }
+  .confirmo input { width: auto; margin-top: 3px; }
+
+  /* ---------- login ---------- */
+  .login { min-height: 100vh; display: grid; grid-template-columns: 420px 1fr; }
+  .login-lado { background: var(--lat); color: var(--lat-txt); padding: 48px 44px; display: flex; flex-direction: column; }
+  .login-lado .marca { padding: 0; font-size: 17px; }
+  .login-lado h1 { font-size: 30px; line-height: 1.2; font-weight: 600; margin: auto 0 14px; letter-spacing: -.01em; }
+  .login-lado p { color: var(--lat-sub); margin: 0 0 6px; }
+  .login-lado .versao-lat { margin-top: 36px; }
+  .login-form { display: grid; place-items: center; padding: 40px; }
+  .login-form .caixa { width: min(520px, 100%); }
+  .login-form h2 { font-size: 20px; font-weight: 600; margin: 0 0 6px; }
+  .certs { display: grid; gap: 10px; margin-top: 20px; }
+  .cert { display: flex; align-items: center; gap: 14px; text-align: left; background: var(--card); border: 1px solid var(--linha); border-radius: 12px;
+          padding: 14px 16px; cursor: pointer; box-shadow: var(--sombra); }
+  .cert:hover { border-color: var(--btn); }
+  .cert .seta { margin-left: auto; color: var(--muted); }
+
+  @media (max-width: 1000px) {
+    .heroi { grid-template-columns: 1fr 1fr; }
+    .duas-colunas, .nova { grid-template-columns: 1fr; }
+    .resumo { position: static; }
+    .login { grid-template-columns: 1fr; }
+    .login-lado { display: none; }
+  }
+  @media (max-width: 760px) {
+    .lateral { width: 64px; padding: 14px 8px; }
+    .lateral .txt, .marca span, .selo-edicao, .rotulo-lat, .cert-lat div, .versao-lat, .segmentado { display: none !important; }
+    .btn-nova, .nav button { justify-content: center; }
+    main { padding: 20px 16px 40px; }
+    .grade { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <h1><img src="/icone.png" alt=""><span id="marca">NFS-e</span></h1>
-  <nav id="menu" class="oculto">
-    <button data-tela="notas">Notas</button>
-    <button data-tela="tomadores">Tomadores</button>
-    <button data-tela="nova">Nova nota</button>
-  </nav>
-  <div class="direita"><span class="direita" id="topo-sessao"></span><button id="tema"></button></div>
-</header>
+<div class="shell">
+  <aside class="lateral oculto" id="lateral"></aside>
+  <main id="app"></main>
+</div>
 
-<main id="app"></main>
-<footer id="rodape"></footer>
+<dialog id="confirmar"></dialog>
 
 <script>
-const estado = { perfil: null, info: null, amb: "prod", tela: "notas", filtro: "emitidas", ultimaSync: null };
-const app = document.getElementById("app");
+const estado = { perfil: null, info: null, amb: "prod", tela: "inicio", filtro: "emitidas", busca: "", ultimaSync: null };
+const $ = id => document.getElementById(id);
+const app = $("app");
 
+// ---------- formatação ----------
 const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brlCurto = v => {
+  const n = Number(v || 0);
+  if (Math.abs(n) >= 1e6) return "R$ " + (n / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mi";
+  if (Math.abs(n) >= 1e3) return "R$ " + (n / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mil";
+  return brl(n);
+};
 const data = s => s ? new Date(s.length === 10 ? s + "T12:00:00" : s).toLocaleDateString("pt-BR") : "";
+const dataCurta = s => s ? new Date(s.length === 10 ? s + "T12:00:00" : s).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "";
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const doc = d => d.length === 14 ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
                 : d.length === 11 ? d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4") : d;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pct = v => Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
+const hora = d => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const nomeAmb = a => a === "prod" ? "Produção" : "Homologação";
+const iniciais = nome => (nome || "?").replace(/\b(S\.?A\.?|LTDA\.?|ME|EPP|EIRELI)\b/gi, "").trim().split(/\s+/).slice(0, 2).map(p => p[0]).join("").toUpperCase();
+const nomeCurto = nome => (nome || "").split(/\s+/).slice(0, 3).join(" ");
+const ajuda = texto => `<span class="ajuda" title="${esc(texto)}">?</span>`;
+const pilulaAmb = a => `<span class="pilula ${a}" title="${a === "prod" ? "Notas emitidas aqui são reais, com valor fiscal" : "Ambiente de teste da Receita: nada aqui tem valor fiscal"}">${nomeAmb(a)}</span>`;
 
+// ---------- ícones (traço fino, cor do texto) ----------
+const ICONES = {
+  inicio: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
+  notas: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  tomadores: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6.5 6.5 0 0 0-2.5-5.1"/>',
+  mais: '<path d="M12 5v14M5 12h14"/>',
+  baixar: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  pdf: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/>',
+  atualizar: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
+  busca: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  sair: '<path d="M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3M10 16l4-4-4-4M14 12H4"/>',
+  sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+  lua: '<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/>',
+  seta: '<path d="m9 6 6 6-6 6"/>',
+  certificado: '<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M7 9h10M7 12.5h6"/><circle cx="17" cy="17.5" r="2.5"/>',
+};
+const icone = nome => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[nome]}</svg>`;
+
+// ---------- API ----------
 async function api(caminho, opcoes = {}) {
   const r = await fetch(caminho, { ...opcoes, headers: { "Content-Type": "application/json", "X-NfseApp": "1", ...(opcoes.headers || {}) } });
   const corpo = r.headers.get("content-type")?.includes("json") ? await r.json() : await r.text();
@@ -112,31 +299,40 @@ async function api(caminho, opcoes = {}) {
 }
 const post = (caminho, corpo) => api(caminho, { method: "POST", body: JSON.stringify(corpo || {}) });
 
-const pct = v => Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
-const hora = d => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-const ajuda = texto => `<span class="ajuda" title="${esc(texto)}">?</span>`;
-
 function mensagem(tipo, texto) { return `<div class="msg ${tipo}">${texto}</div>`; }
-function carregando(texto) { app.innerHTML = `<div class="card sub">${esc(texto)}…</div>`; }
+function carregando(texto) { app.innerHTML = `<div class="conteudo"><div class="card card-corpo sub">${esc(texto)}…</div></div>`; }
 
 // ---------- login ----------
 async function telaLogin(erro) {
-  document.getElementById("menu").classList.add("oculto");
-  document.getElementById("topo-sessao").innerHTML = "";
-  carregando("Procurando certificados instalados");
+  $("lateral").classList.add("oculto");
+  app.style.padding = "0";
   const certs = await api("/api/certificados");
+  const i = estado.info;
   app.innerHTML = `
-    <div class="card" style="max-width:640px;margin:40px auto">
-      <h2 style="margin-top:0">Entrar com certificado digital</h2>
-      <p class="sub">Escolha o certificado ICP-Brasil (e-CNPJ) instalado neste computador. A chave nunca sai da sua máquina.</p>
-      ${erro ? mensagem("erro", esc(erro)) : ""}
-      ${certs.length ? "" : mensagem("info", "Nenhum certificado ICP-Brasil válido encontrado no Windows (Certificados do usuário → Pessoal).")}
-      <div class="certs">
-        ${certs.map(c => `
-          <button class="cert" data-thumb="${esc(c.thumbprint)}">
-            <strong>${esc(c.nome)}</strong><br>
-            <span class="sub">${c.tipoDocumento} ${doc(c.documento)} · válido até ${data(c.validade)} · ${esc(c.emissor)}</span>
-          </button>`).join("")}
+    <div class="login">
+      <div class="login-lado">
+        <div class="marca"><img src="/icone.png" alt=""><span>${esc(i.nome)}</span></div>
+        <h1>Notas fiscais de serviço, sem portal.</h1>
+        <p>Emita copiando a última nota do cliente, acompanhe o faturamento e baixe XML e PDF.</p>
+        <p>Tudo direto do Sistema Nacional da NFS-e, com o seu certificado.</p>
+        <div class="versao-lat">v${esc(i.versao)}</div>
+      </div>
+      <div class="login-form">
+        <div class="caixa">
+          <h2>Entrar com certificado digital</h2>
+          <div class="sub">Escolha o e-CNPJ instalado neste computador. A chave nunca sai da sua máquina.</div>
+          ${erro ? `<div style="margin-top:16px">${mensagem("erro", esc(erro))}</div>` : ""}
+          ${certs.length ? "" : `<div style="margin-top:16px">${mensagem("info", "Nenhum certificado ICP-Brasil válido encontrado no Windows (Certificados do usuário → Pessoal).")}</div>`}
+          <div class="certs">
+            ${certs.map(c => `
+              <button class="cert" data-thumb="${esc(c.thumbprint)}">
+                <span class="iniciais">${esc(iniciais(c.nome))}</span>
+                <span><strong>${esc(c.nome)}</strong><br>
+                  <span class="sub" style="font-size:12.5px">${c.tipoDocumento} ${doc(c.documento)} · válido até ${data(c.validade)} · ${esc(c.emissor)}</span></span>
+                <span class="seta">${icone("seta")}</span>
+              </button>`).join("")}
+          </div>
+        </div>
       </div>
     </div>`;
   app.querySelectorAll(".cert").forEach(b => b.onclick = async () => {
@@ -146,138 +342,349 @@ async function telaLogin(erro) {
   });
 }
 
-function montarTopo() {
-  const p = estado.perfil;
-  document.getElementById("menu").classList.remove("oculto");
-  const temHom = estado.info.temHomologacao;
-  document.getElementById("topo-sessao").innerHTML = `
-    <span title="Certificado em uso">${esc(p.nome)} · ${doc(p.documento)}</span>
-    ${temHom ? `<select id="amb" style="width:auto" title="Homologação: ambiente de teste da Receita, notas sem valor fiscal. Produção: notas reais.">
-      <option value="hom">Homologação (teste)</option>
-      <option value="prod">Produção (vale de verdade)</option>
-    </select>` : ""}
-    <span class="tag ${estado.amb}" title="${estado.amb === "prod" ? "Notas emitidas aqui são reais, com valor fiscal" : "Ambiente de teste: nada aqui tem valor fiscal"}">${nomeAmb(estado.amb)}</span>
-    <button class="btn sec" id="sair" title="Sair e escolher outro certificado">Sair</button>`;
-  if (temHom) {
-    const sel = document.getElementById("amb");
-    sel.value = estado.amb;
-    sel.onchange = async () => {
-      estado.amb = sel.value;
-      try { localStorage.setItem("amb", estado.amb); } catch { }
-      montarTopo();
-      await sincronizarQuieto(estado.amb);
-      mostrar(estado.tela);
-    };
-  }
-  document.getElementById("sair").onclick = async () => { await post("/api/logout"); estado.perfil = null; montarRodape(); telaLogin(); };
-  document.querySelectorAll("#menu button").forEach(b => {
-    b.classList.toggle("ativo", b.dataset.tela === estado.tela);
-    b.onclick = () => mostrar(b.dataset.tela);
+// ---------- barra lateral ----------
+function montarLateral() {
+  const p = estado.perfil, i = estado.info;
+  const lat = $("lateral");
+  lat.classList.remove("oculto");
+  app.style.padding = "";
+  const temaEscuro = document.documentElement.dataset.tema === "escuro";
+  lat.innerHTML = `
+    <div class="marca"><img src="/icone.png" alt=""><span>NFS-e</span>${i.temHomologacao ? '<span class="selo-edicao">TESTE</span>' : ""}</div>
+    <button class="btn-nova" data-tela="nova" title="Preparar uma nota nova copiando a última nota do cliente">${icone("mais")}<span class="txt">Nova nota</span></button>
+    <nav class="nav">
+      <button data-tela="inicio" title="Início">${icone("inicio")}<span class="txt">Início</span></button>
+      <button data-tela="notas" title="Notas">${icone("notas")}<span class="txt">Notas</span></button>
+      <button data-tela="tomadores" title="Tomadores">${icone("tomadores")}<span class="txt">Tomadores</span></button>
+    </nav>
+    <div class="rodape-lat">
+      <div>
+        <div class="rotulo-lat">Ambiente</div>
+        ${i.temHomologacao
+          ? `<div class="segmentado" title="Homologação: ambiente de teste da Receita, sem valor fiscal. Produção: notas reais.">
+               <button data-amb="prod" class="${estado.amb === "prod" ? "ativo" : ""}">Produção</button>
+               <button data-amb="hom" class="${estado.amb === "hom" ? "ativo" : ""}">Homologação</button>
+             </div>`
+          : `<div class="amb-fixo" title="Esta versão só emite em produção (notas reais)"><span class="ponto"></span><span class="txt">Produção</span></div>`}
+      </div>
+      <div class="cert-lat" title="Certificado em uso: ${esc(p.nome)} · ${doc(p.documento)}">
+        <span class="avatar">${esc(iniciais(p.nome))}</span>
+        <div><div class="nome">${esc(p.nome)}</div><div class="doc">${doc(p.documento)}</div></div>
+      </div>
+      <div class="acoes-lat">
+        <button id="tema" title="${temaEscuro ? "Mudar para tema claro" : "Mudar para tema escuro"}">${icone(temaEscuro ? "sol" : "lua")}<span class="txt">Tema</span></button>
+        <button id="sair" title="Sair e escolher outro certificado">${icone("sair")}<span class="txt">Sair</span></button>
+      </div>
+      <div class="versao-lat" title="Notas, cancelamentos e tomadores vêm do Sistema Nacional da NFS-e (Sefin e ADN) pelo seu certificado. Cópia local em ${esc(i.pastaDados)}\\${esc(p.documento)}">
+        v${esc(i.versao)} · dados do Ambiente Nacional</div>
+    </div>`;
+  lat.querySelectorAll("[data-tela]").forEach(b => b.onclick = () => mostrar(b.dataset.tela));
+  lat.querySelectorAll("[data-amb]").forEach(b => b.onclick = async () => {
+    if (estado.amb === b.dataset.amb) return;
+    estado.amb = b.dataset.amb;
+    try { localStorage.setItem("amb", estado.amb); } catch { }
+    montarLateral();
+    await sincronizarQuieto(estado.amb);
+    mostrar(estado.tela);
   });
+  $("tema").onclick = () => {
+    const novo = document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro";
+    try { localStorage.setItem("tema", novo); } catch { }
+    document.documentElement.dataset.tema = novo;
+    montarLateral();
+    if (estado.tela === "inicio") mostrar("inicio"); // o gráfico lê as cores do tema
+  };
+  $("sair").onclick = async () => { await post("/api/logout"); estado.perfil = null; telaLogin(); };
+  marcarMenu();
+}
+
+function marcarMenu() {
+  document.querySelectorAll(".nav [data-tela]").forEach(b => b.classList.toggle("ativo", b.dataset.tela === estado.tela));
 }
 
 function mostrar(tela, parametro) {
   estado.tela = tela;
-  document.querySelectorAll("#menu button").forEach(b => b.classList.toggle("ativo", b.dataset.tela === tela));
-  ({ notas: telaNotas, tomadores: telaTomadores, nova: telaNova })[tela](parametro);
+  marcarMenu();
+  ({ inicio: telaInicio, notas: telaNotas, tomadores: telaTomadores, nova: telaNova })[tela](parametro);
 }
 
-// ---------- notas ----------
-async function telaNotas(aviso) {
-  carregando("Carregando notas");
-  const { emitidas, recebidas } = await api(`/api/notas?amb=${estado.amb}`);
-  const lista = estado.filtro === "emitidas" ? emitidas : recebidas;
-  const outra = estado.filtro === "emitidas" ? "toma" : "prest";
-  const ativas = lista.filter(n => !n.cancelada);
-  app.innerHTML = `
-    ${aviso || ""}
-    <div class="card">
-      <div class="linha-acoes" style="margin-top:0;margin-bottom:12px">
-        <select id="filtro" style="width:auto" title="Emitidas: notas em que você é o prestador. Recebidas: notas de serviços que você contratou.">
-          <option value="emitidas">Emitidas por mim (${emitidas.length})</option>
-          <option value="recebidas">Recebidas (${recebidas.length})</option>
-        </select>
-        <span class="tag ${estado.amb}">${nomeAmb(estado.amb)}</span>
-        <span class="sub" style="margin-left:auto">${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</span>
-        <button class="btn sec" id="sync" title="Busca no Ambiente de Dados Nacional (ADN) as notas e cancelamentos novos deste CNPJ">Atualizar do ADN</button>
-      </div>
-      ${lista.length ? `
-      <div class="rolagem"><table>
-        <thead><tr><th>Nº</th>
-          <th title="Data e hora em que a Sefin autorizou a nota">Emissão</th>
-          <th title="Data a que o serviço se refere; define o mês de apuração dos impostos">Competência</th>
-          <th>${estado.filtro === "emitidas" ? "Tomador" : "Prestador"}</th>
-          <th class="num" title="Valor bruto do serviço, antes de descontos">Valor serviço</th>
-          <th class="num" title="Valor a receber: serviço menos descontos e retenções">Líquido</th>
-          <th>Situação</th><th></th></tr></thead>
-        <tbody>
-        ${lista.map(n => `
-          <tr class="${n.cancelada ? "cancelada" : ""}">
-            <td title="Chave de acesso: ${n.chave}">${n.numero}</td><td>${data(n.dhProc)}</td><td>${data(n.competencia)}</td>
-            <td>${esc(n[outra + "Nome"])}<br><span class="sub">${doc(n[outra + "Doc"])}</span></td>
-            <td class="num">${brl(n.vServ)}</td><td class="num">${brl(n.vLiq)}</td>
-            <td class="sit">${n.cancelada
-              ? `<span class="tag canc" title="Motivo do cancelamento: ${esc(n.motivoCancelamento)}">Cancelada</span>`
-              : `<span class="tag ok" title="Autorizada pela Sefin e válida">Autorizada</span>`}</td>
-            <td class="acoes" style="white-space:nowrap">
-              <a class="btn sec" href="/api/notas/${n.chave}/xml?amb=${estado.amb}" title="Baixar o XML oficial da nota (o documento fiscal em si)">XML</a>
-              <a class="btn sec" href="/api/notas/${n.chave}/pdf?amb=${estado.amb}" target="_blank" title="Abrir o DANFSe: o PDF da nota, gerado pelo Ambiente Nacional">PDF</a>
-            </td>
-          </tr>`).join("")}
-        </tbody>
-        <tfoot><tr><td colspan="4" class="sub">${ativas.length} autorizada(s)${lista.length > ativas.length ? `, ${lista.length - ativas.length} cancelada(s) fora do total` : ""}</td>
-          <td class="num"><strong>${brl(ativas.reduce((s, n) => s + n.vServ, 0))}</strong></td>
-          <td class="num"><strong>${brl(ativas.reduce((s, n) => s + n.vLiq, 0))}</strong></td><td colspan="2"></td></tr></tfoot>
-      </table></div>` : `<p class="sub">Nenhuma nota ${estado.filtro} neste ambiente. Clique em “Atualizar do ADN” para buscar.</p>`}
-    </div>`;
-  const f = document.getElementById("filtro");
-  f.value = estado.filtro;
-  f.onchange = () => { estado.filtro = f.value; telaNotas(); };
-  document.getElementById("sync").onclick = () => sincronizar(estado.amb, telaNotas);
-}
-
-async function sincronizar(amb, depois) {
-  carregando("Buscando notas no Ambiente Nacional");
-  try {
-    const r = await post(`/api/sincronizar?amb=${amb}`);
-    estado.ultimaSync = new Date();
-    depois(mensagem("ok", r.novos ? `${r.novos} documento(s) novo(s) baixado(s).` : "Tudo em dia: nenhum documento novo."));
-  }
-  catch (e) { depois(mensagem("erro", esc(e.message))); }
-}
-
-// Ao entrar (e ao trocar de ambiente) já busca o que chegou de novo, sem o usuário precisar lembrar.
 async function sincronizarQuieto(amb) {
   carregando("Buscando notas novas no Ambiente Nacional");
   const ambientes = amb === "prod" ? ["prod"] : ["prod", amb]; // tomadores e notas-base vêm sempre da produção
   try { for (const a of ambientes) await post(`/api/sincronizar?amb=${a}`); estado.ultimaSync = new Date(); }
-  catch { /* sem rede: a tela mostra o que já está salvo e o botão "Atualizar do ADN" continua lá */ }
+  catch { /* sem rede: mostra o que já está salvo; o botão Atualizar continua disponível */ }
+}
+
+async function sincronizar(depois) {
+  carregando("Buscando notas no Ambiente Nacional");
+  try {
+    const r = await post(`/api/sincronizar?amb=${estado.amb}`);
+    estado.ultimaSync = new Date();
+    depois(mensagem("ok", r.novos ? `${r.novos} documento(s) novo(s) baixado(s).` : "Tudo em dia: nenhum documento novo."));
+  } catch (e) { depois(mensagem("erro", esc(e.message))); }
+}
+
+// ---------- início ----------
+function competencia(n) { const [a, m] = n.competencia.split("-").map(Number); return { ano: a, mes: m - 1 }; }
+
+async function telaInicio() {
+  carregando("Carregando o painel");
+  let notas, tomadores;
+  try { [notas, tomadores] = await Promise.all([api(`/api/notas?amb=${estado.amb}`), api("/api/tomadores")]); }
+  catch (e) { app.innerHTML = `<div class="conteudo">${mensagem("erro", esc(e.message))}</div>`; return; }
+  const validas = notas.emitidas.filter(n => !n.cancelada);
+  const hoje = new Date(), ano = hoje.getFullYear(), mes = hoje.getMonth();
+  const doMes = validas.filter(n => { const c = competencia(n); return c.ano === ano && c.mes === mes; });
+  const doAno = validas.filter(n => competencia(n).ano === ano);
+  const soma = l => l.reduce((s, n) => s + n.vServ, 0);
+  const ultima = validas[0];
+
+  const meses = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(ano, mes - i, 1);
+    const daquele = validas.filter(n => { const c = competencia(n); return c.ano === d.getFullYear() && c.mes === d.getMonth(); });
+    meses.push({ data: d, total: soma(daquele), qtd: daquele.length });
+  }
+  const comNota = meses.filter(m => m.qtd > 0);
+  const media = comNota.length ? soma(validas.filter(n => { const c = competencia(n); const d = new Date(c.ano, c.mes, 1); return d >= meses[0].data; })) / 12 : 0;
+
+  const proximo = tomadores[0];
+  const jaEmitida = proximo && doMes.find(n => n.tomaDoc === proximo.documento);
+
+  app.innerHTML = `
+    <div class="conteudo">
+      <div class="cabecalho">
+        <div><h1>${MESES[mes][0].toUpperCase() + MESES[mes].slice(1)} de ${ano}</h1>
+          <div class="sub">${pilulaAmb(estado.amb)} &nbsp;${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</div></div>
+        <div class="direita">
+          <button class="btn sec" id="sync" title="Busca no Ambiente de Dados Nacional (ADN) as notas e cancelamentos novos">${icone("atualizar")} Atualizar</button>
+          <button class="btn" data-ir="nova">${icone("mais")} Nova nota</button>
+        </div>
+      </div>
+      <div id="aviso"></div>
+
+      <div class="heroi">
+        <div class="card tile principal" title="Soma do valor dos serviços das notas autorizadas com competência em ${ano}">
+          <div class="rotulo">Faturado em ${ano}</div>
+          <div class="valor numero-grande">${brl(soma(doAno))}</div>
+          <div class="detalhe">${doAno.length} nota(s) autorizada(s)</div>
+        </div>
+        <div class="card tile" title="Notas autorizadas com competência neste mês">
+          <div class="rotulo">Faturado em ${MESES[mes]}</div>
+          <div class="valor">${doMes.length ? brl(soma(doMes)) : "—"}</div>
+          <div class="detalhe">${doMes.length ? doMes.length + " nota(s)" : "nenhuma nota ainda"}</div>
+        </div>
+        <div class="card tile" title="Média dos últimos 12 meses, contando meses sem nota">
+          <div class="rotulo">Média mensal (12 meses)</div>
+          <div class="valor">${brlCurto(media)}</div>
+          <div class="detalhe">${comNota.length} de 12 meses com nota</div>
+        </div>
+        <div class="card tile">
+          <div class="rotulo">Última nota</div>
+          <div class="valor">${ultima ? "nº " + ultima.numero : "—"}</div>
+          <div class="detalhe">${ultima ? `${dataCurta(ultima.dhProc)} · ${esc(nomeCurto(ultima.tomaNome))}` : "nenhuma nota emitida"}</div>
+        </div>
+      </div>
+
+      <div class="duas-colunas">
+        <div class="card">
+          <div class="card-titulo"><h2>Faturamento por mês</h2><span class="sub" style="font-size:12.5px">valor dos serviços · por competência</span></div>
+          <div class="grafico" id="grafico"></div>
+          <details class="tabela-grafico"><summary>Ver como tabela</summary>
+            <table class="lista" style="margin-top:8px"><thead><tr><th>Mês</th><th class="num">Notas</th><th class="num">Valor</th></tr></thead><tbody>
+            ${meses.map(m => `<tr><td>${MESES[m.data.getMonth()]} ${m.data.getFullYear()}</td><td class="num">${m.qtd}</td><td class="num">${brl(m.total)}</td></tr>`).join("")}
+            </tbody></table></details>
+        </div>
+        <div class="card card-corpo">
+          <div class="proxima">
+            <div class="rotulo sub" style="font-size:12.5px;font-weight:500">Próxima nota</div>
+            ${!proximo ? `<div class="sub">Nenhum tomador ainda: emita a primeira nota pelo Emissor Nacional.</div>`
+              : jaEmitida ? `
+                <div class="tomador">${esc(proximo.nome)}</div>
+                <div><span class="pilula ok">Nota de ${MESES[mes]} já emitida</span></div>
+                <div class="sub">nº ${jaEmitida.numero} · ${brl(jaEmitida.vServ)} · ${data(jaEmitida.dhProc)}</div>
+                <div style="margin-top:auto"><button class="btn sec" data-ir="notas">Ver notas</button></div>`
+              : `
+                <div class="tomador">${esc(proximo.nome)}</div>
+                <div class="sub">Última nota: nº ${proximo.ultimoNumero} · ${brl(proximo.ultimoValor)} · ${data(proximo.ultimaData)}</div>
+                <div class="sub" style="font-size:12.5px">Copia a última nota desse cliente; você só confere valor e competência.</div>
+                <div style="margin-top:auto"><button class="btn" data-proximo="${proximo.documento}">Preparar nota de ${MESES[mes]} ${icone("seta")}</button></div>`}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-titulo"><h2>Últimas notas</h2><span class="direita"><a href="#" data-ir="notas">Ver todas</a></span></div>
+        <div style="padding:6px 8px 8px">${tabelaNotas(notas.emitidas.slice(0, 5), "emitidas", false)}</div>
+      </div>
+    </div>`;
+
+  desenharGrafico($("grafico"), meses);
+  app.querySelectorAll("[data-ir]").forEach(b => b.onclick = e => { e.preventDefault(); mostrar(b.dataset.ir); });
+  app.querySelectorAll("[data-proximo]").forEach(b => b.onclick = () => mostrar("nova", b.dataset.proximo));
+  $("sync").onclick = () => sincronizar(aviso => telaInicio().then(() => { const a = $("aviso"); if (a) a.innerHTML = aviso; }));
+}
+
+// Barras de uma série só: uma cor, sem legenda (o título diz o que é), valor escrito só no maior e no mês mais recente com nota.
+function desenharGrafico(alvo, meses) {
+  const L = 680, A = 210, esq = 54, topo = 18, base = 178;
+  const max = Math.max(...meses.map(m => m.total), 1);
+  const passo = Math.pow(10, Math.floor(Math.log10(max)));
+  const teto = Math.ceil(max / passo) * passo;
+  const y = v => base - (v / teto) * (base - topo);
+  const faixa = (L - esq) / meses.length;
+  const largura = Math.min(24, faixa * 0.55);
+  const maior = meses.reduce((a, m, i) => m.total > meses[a].total ? i : a, 0);
+  const recente = meses.map(m => m.qtd > 0).lastIndexOf(true);
+  const curto = v => v >= 1e3 ? (v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mil" : v.toLocaleString("pt-BR");
+
+  let svg = `<svg viewBox="0 0 ${L} ${A}" role="img" aria-label="Faturamento por mês nos últimos 12 meses">`;
+  for (const v of [teto / 2, teto]) svg += `<line class="grade" x1="${esq}" x2="${L}" y1="${y(v)}" y2="${y(v)}"/><text x="${esq - 8}" y="${y(v) + 4}" text-anchor="end">${curto(v)}</text>`;
+  svg += `<line class="base" x1="${esq}" x2="${L}" y1="${base}" y2="${base}"/><text x="${esq - 8}" y="${base + 4}" text-anchor="end">0</text>`;
+  meses.forEach((m, i) => {
+    const cx = esq + faixa * i + faixa / 2, x = cx - largura / 2;
+    if (m.total > 0) {
+      const t = y(m.total), r = Math.min(4, (base - t) / 2);
+      // Ponta arredondada (4px) em cima, quadrada na base.
+      svg += `<path class="barra" d="M${x},${base} V${t + r} Q${x},${t} ${x + r},${t} H${x + largura - r} Q${x + largura},${t} ${x + largura},${t + r} V${base} Z"/>`;
+      if (i === maior || i === recente) svg += `<text class="valor-barra" x="${cx}" y="${t - 6}" text-anchor="middle">${curto(m.total)}</text>`;
+    }
+    const rotulo = MESES[m.data.getMonth()].slice(0, 3) + (m.data.getMonth() === 0 || i === 0 ? "/" + String(m.data.getFullYear()).slice(2) : "");
+    svg += `<text x="${cx}" y="${base + 18}" text-anchor="middle">${rotulo}</text>`;
+    svg += `<rect class="barra-alvo" tabindex="0" data-i="${i}" x="${esq + faixa * i + 1}" y="${topo - 10}" width="${faixa - 2}" height="${base - topo + 10}"/>`;
+  });
+  svg += `</svg>`;
+  alvo.innerHTML = svg + `<div class="tooltip oculto"></div>`;
+
+  const dica = alvo.querySelector(".tooltip");
+  const mostrarDica = (el) => {
+    const m = meses[+el.dataset.i];
+    dica.replaceChildren();
+    const forte = document.createElement("strong");
+    forte.textContent = brl(m.total);
+    dica.append(forte, document.createTextNode(`${MESES[m.data.getMonth()]} ${m.data.getFullYear()} · ${m.qtd} nota(s)`));
+    const caixa = alvo.getBoundingClientRect(), r = el.getBoundingClientRect();
+    const svgEl = alvo.querySelector("svg"), escala = svgEl.getBoundingClientRect().height / A;
+    dica.style.left = (r.left - caixa.left + r.width / 2) + "px";
+    dica.style.top = (svgEl.getBoundingClientRect().top - caixa.top + (m.total > 0 ? y(m.total) : base) * escala - 8) + "px";
+    dica.classList.remove("oculto");
+  };
+  alvo.querySelectorAll(".barra-alvo").forEach(el => {
+    el.addEventListener("pointerenter", () => mostrarDica(el));
+    el.addEventListener("focus", () => mostrarDica(el));
+    el.addEventListener("pointerleave", () => dica.classList.add("oculto"));
+    el.addEventListener("blur", () => dica.classList.add("oculto"));
+  });
+}
+
+// ---------- notas ----------
+function tabelaNotas(lista, filtro, comTotais) {
+  if (!lista.length) return `<div class="vazio">Nenhuma nota ${filtro} neste ambiente.</div>`;
+  const outra = filtro === "emitidas" ? "toma" : "prest";
+  const ativas = lista.filter(n => !n.cancelada);
+  return `
+    <table class="lista">
+      <thead><tr><th>Nº</th><th>${filtro === "emitidas" ? "Tomador" : "Prestador"}</th>
+        <th title="Data a que o serviço se refere; define o mês de apuração dos impostos">Competência</th>
+        <th title="Data e hora em que a Sefin autorizou a nota">Emissão</th>
+        <th class="num" title="Valor bruto do serviço, antes de descontos">Valor</th>
+        <th class="num" title="Valor a receber: serviço menos descontos e retenções">Líquido</th>
+        <th>Situação</th><th></th></tr></thead>
+      <tbody>
+      ${lista.map(n => `
+        <tr class="${n.cancelada ? "cancelada" : ""}">
+          <td class="nnota" title="Chave de acesso: ${n.chave}">${n.numero}</td>
+          <td class="nome-doc">${esc(n[outra + "Nome"])}<div class="doc">${doc(n[outra + "Doc"])}</div></td>
+          <td>${data(n.competencia)}</td><td>${data(n.dhProc)}</td>
+          <td class="num"><span class="valor-cancelado">${brl(n.vServ)}</span></td>
+          <td class="num"><span class="valor-cancelado">${brl(n.vLiq)}</span></td>
+          <td class="sit">${n.cancelada
+            ? `<span class="pilula canc" title="Motivo do cancelamento: ${esc(n.motivoCancelamento)}">Cancelada</span>`
+            : `<span class="pilula ok" title="Autorizada pela Sefin e válida">Autorizada</span>`}</td>
+          <td class="acoes">
+            <a class="btn sec icone" href="/api/notas/${n.chave}/xml?amb=${estado.amb}" title="Baixar o XML oficial da nota (o documento fiscal em si)">${icone("baixar")} XML</a>
+            <a class="btn sec icone" href="/api/notas/${n.chave}/pdf?amb=${estado.amb}" target="_blank" title="Abrir o DANFSe: o PDF da nota, gerado pelo Ambiente Nacional">${icone("pdf")} PDF</a>
+          </td>
+        </tr>`).join("")}
+      </tbody>
+      ${comTotais ? `<tfoot><tr><td colspan="4">${ativas.length} autorizada(s)${lista.length > ativas.length ? ` · ${lista.length - ativas.length} cancelada(s) fora do total` : ""}</td>
+        <td class="num">${brl(ativas.reduce((s, n) => s + n.vServ, 0))}</td><td class="num">${brl(ativas.reduce((s, n) => s + n.vLiq, 0))}</td><td colspan="2"></td></tr></tfoot>` : ""}
+    </table>`;
+}
+
+async function telaNotas(aviso) {
+  carregando("Carregando notas");
+  let notas;
+  try { notas = await api(`/api/notas?amb=${estado.amb}`); }
+  catch (e) { app.innerHTML = `<div class="conteudo">${mensagem("erro", esc(e.message))}</div>`; return; }
+  const desenhar = () => {
+    const termo = estado.busca.trim().toLowerCase();
+    const outra = estado.filtro === "emitidas" ? "toma" : "prest";
+    const lista = notas[estado.filtro].filter(n => !termo || String(n.numero).includes(termo)
+      || (n[outra + "Nome"] || "").toLowerCase().includes(termo) || (n[outra + "Doc"] || "").includes(termo.replace(/\D/g, "") || "#"));
+    $("lista-notas").innerHTML = tabelaNotas(lista, estado.filtro, true);
+  };
+  app.innerHTML = `
+    <div class="conteudo">
+      <div class="cabecalho">
+        <div><h1>Notas</h1><div class="sub">${pilulaAmb(estado.amb)} &nbsp;${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</div></div>
+        <div class="direita">
+          <button class="btn sec" id="sync" title="Busca no Ambiente de Dados Nacional (ADN) as notas e cancelamentos novos deste CNPJ">${icone("atualizar")} Atualizar</button>
+          <button class="btn" id="nova">${icone("mais")} Nova nota</button>
+        </div>
+      </div>
+      ${aviso || ""}
+      <div class="card">
+        <div class="barra-ferramentas">
+          <div class="chips" title="Emitidas: você é o prestador. Recebidas: serviços que você contratou.">
+            <button data-filtro="emitidas">Emitidas · ${notas.emitidas.length}</button>
+            <button data-filtro="recebidas">Recebidas · ${notas.recebidas.length}</button>
+          </div>
+          <div class="busca">${icone("busca")}<input id="busca" placeholder="Buscar por nº, nome ou CNPJ" value="${esc(estado.busca)}"></div>
+        </div>
+        <div id="lista-notas"></div>
+      </div>
+    </div>`;
+  const chips = app.querySelectorAll("[data-filtro]");
+  const marcar = () => chips.forEach(c => c.classList.toggle("ativo", c.dataset.filtro === estado.filtro));
+  chips.forEach(c => c.onclick = () => { estado.filtro = c.dataset.filtro; marcar(); desenhar(); });
+  $("busca").oninput = e => { estado.busca = e.target.value; desenhar(); };
+  $("sync").onclick = () => sincronizar(telaNotas);
+  $("nova").onclick = () => mostrar("nova");
+  marcar();
+  desenhar();
 }
 
 // ---------- tomadores ----------
 async function telaTomadores() {
   carregando("Carregando tomadores");
-  const tomadores = await api("/api/tomadores");
+  let tomadores;
+  try { tomadores = await api("/api/tomadores"); }
+  catch (e) { app.innerHTML = `<div class="conteudo">${mensagem("erro", esc(e.message))}</div>`; return; }
   app.innerHTML = `
-    <div class="card">
-      <p class="sub" style="margin-top:0">Os tomadores não são cadastrados no app: saem das notas que você já emitiu em produção
-        (canceladas não contam), com nome e e-mail da nota mais recente.
-        Para um cliente novo, emita a primeira nota no Emissor Nacional; depois ele aparece aqui.</p>
-      ${tomadores.length ? `
-      <div class="rolagem"><table>
-        <thead><tr><th>Tomador</th><th title="E-mail informado na nota mais recente para esse cliente">E-mail</th>
-          <th class="num">Notas</th><th class="num" title="Soma do valor dos serviços das notas autorizadas">Total faturado</th><th>Última nota</th><th></th></tr></thead>
-        <tbody>
-        ${tomadores.map(t => `
-          <tr>
-            <td>${esc(t.nome)}<br><span class="sub">${doc(t.documento)}</span></td>
-            <td>${t.email ? esc(t.email) : `<span class="sub">—</span>`}</td>
-            <td class="num">${t.notas}</td><td class="num">${brl(t.total)}</td>
-            <td>nº ${t.ultimoNumero} · ${data(t.ultimaData)} · ${brl(t.ultimoValor)}</td>
-            <td><button class="btn sec" data-doc="${t.documento}" title="Preparar uma nota nova copiando a última nota desse tomador">Nova nota</button></td>
-          </tr>`).join("")}
-        </tbody>
-      </table></div>` : `<p class="sub">Nenhum tomador ainda: não há notas emitidas em produção neste CNPJ.</p>`}
+    <div class="conteudo">
+      <div class="cabecalho">
+        <div><h1>Tomadores</h1>
+          <div class="sub">Saem das notas que você já emitiu em produção (canceladas não contam). Cliente novo: emita a primeira nota pelo Emissor Nacional.</div></div>
+      </div>
+      <div class="card">
+        ${tomadores.length ? `
+        <table class="lista">
+          <thead><tr><th></th><th>Tomador</th><th title="E-mail informado na nota mais recente para esse cliente">E-mail</th>
+            <th class="num">Notas</th><th class="num" title="Soma do valor dos serviços das notas autorizadas">Total faturado</th><th>Última nota</th><th></th></tr></thead>
+          <tbody>
+          ${tomadores.map(t => `
+            <tr>
+              <td style="width:48px"><span class="iniciais">${esc(iniciais(t.nome))}</span></td>
+              <td class="nome-doc"><strong>${esc(t.nome)}</strong><div class="doc">${doc(t.documento)}</div></td>
+              <td>${t.email ? esc(t.email) : `<span class="muted">—</span>`}</td>
+              <td class="num">${t.notas}</td><td class="num">${brl(t.total)}</td>
+              <td>nº ${t.ultimoNumero} · ${data(t.ultimaData)}<div class="doc muted" style="font-size:12px">${brl(t.ultimoValor)}</div></td>
+              <td class="acoes"><button class="btn sec icone" data-doc="${t.documento}" title="Preparar uma nota nova copiando a última nota desse tomador">${icone("mais")} Nova nota</button></td>
+            </tr>`).join("")}
+          </tbody>
+        </table>` : `<div class="vazio">Nenhum tomador ainda: não há notas emitidas em produção neste CNPJ.</div>`}
+      </div>
     </div>`;
   app.querySelectorAll("button[data-doc]").forEach(b => b.onclick = () => mostrar("nova", b.dataset.doc));
 }
@@ -291,162 +698,174 @@ async function telaNova(tomador) {
       api("/api/tomadores"),
       api(`/api/nova?amb=${estado.amb}${tomador ? "&tomador=" + tomador : ""}`),
     ]);
-  } catch (e) { app.innerHTML = mensagem("erro", esc(e.message)); return; }
+  } catch (e) { app.innerHTML = `<div class="conteudo">${mensagem("erro", esc(e.message))}</div>`; return; }
   const b = info.base, s = info.sugestao, t = info.tributacao;
   const prod = estado.amb === "prod";
-  const contato = (atual, antes) => (atual || "—") + (atual !== (antes || "") && !info.emailTomadorRemovido ? ` <span class="sub">(antes: ${esc(antes || "nenhum")})</span>` : "");
   app.innerHTML = `
-    ${info.aviso ? mensagem("erro", esc(info.aviso)) : ""}
-    <div class="card">
-      <h2 style="margin-top:0">Nova nota <span class="tag ${estado.amb}">${nomeAmb(estado.amb)}</span></h2>
-      <p class="sub">Copiando a nota <strong>nº ${b.numero}</strong> de ${data(b.dhProc)} (${brl(b.vServ)}). Mesmo tomador, serviço e tributação; ajuste o que mudou.</p>
-      <div class="grade">
-        <div><label>Tomador ${ajuda("Clientes que já receberam nota sua. Trocar o tomador muda a nota-base para a última nota dele.")}</label>
-          <select id="tomador">${tomadores.map(x => `<option value="${x.documento}" ${x.documento === b.tomaDoc ? "selected" : ""}>${esc(x.nome)} · ${doc(x.documento)}</option>`).join("")}</select></div>
-        <div><label>Competência ${ajuda("Data a que o serviço se refere. Define o mês em que os impostos são apurados. Não pode ser futura.")}</label>
-          <input id="dCompet" type="date" value="${s.dCompet}" max="${s.dCompet}"></div>
-        <div><label>Valor do serviço (R$) ${ajuda("Valor bruto do serviço, antes de qualquer desconto.")}</label>
-          <input id="vServ" type="number" step="0.01" min="0.01" value="${s.vServ}"></div>
-        <div><label>Desconto incondicionado (R$) ${ajuda("Desconto que não depende de condição futura (ex.: abatimento já negociado). Reduz a base de cálculo dos tributos. Use 0 se não houver.")}</label>
-          <input id="vDesc" type="number" step="0.01" min="0" value="${s.vDescIncond}"></div>
-        ${info.simples ? `<div><label>% tributos do Simples Nacional ${ajuda("Percentual aproximado de tributos do Simples, exigido pela Lei da Transparência (12.741). É informativo e vem do contador. O app lembra o último valor usado.")}</label>
-          <input id="pct" type="number" step="0.01" min="0" value="${s.pTotTribSN ?? ""}" placeholder="pergunte ao contador"></div>` : ""}
-        <div><label>E-mail do tomador ${ajuda(info.emailTomadorRemovido
-            ? "Em homologação o e-mail da nota real não é usado, para o teste não chegar ao cliente. Se quiser, digite um e-mail seu."
-            : "Veio da nota anterior. Se o cliente mudou de e-mail, corrija aqui: a nota nova sai com o e-mail novo e as próximas também.")}</label>
-          <input id="email" type="email" maxlength="80" value="${esc(s.emailTomador)}" placeholder="${info.emailTomadorRemovido ? "opcional: um e-mail seu para testar" : "sem e-mail"}"></div>
-        <div><label>Telefone do tomador ${ajuda("Só números, com DDD (6 a 20 dígitos). Opcional.")}</label>
-          <input id="fone" inputmode="numeric" maxlength="20" value="${esc(s.foneTomador)}" placeholder="sem telefone"></div>
+    <div class="conteudo">
+      <div class="cabecalho">
+        <div><h1>Nova nota</h1><div class="sub">${pilulaAmb(estado.amb)} &nbsp;Mesmo tomador, serviço e tributação da nota anterior; ajuste o que mudou.</div></div>
       </div>
-      <div style="margin-top:14px"><label>Descrição do serviço ${ajuda("Texto que o tomador lê na nota. Seja específico se o cliente pedir (ex.: mês de referência, contrato).")}</label>
-        <textarea id="descricao" rows="2">${esc(s.descricao)}</textarea></div>
+      ${info.aviso ? mensagem("erro", esc(info.aviso)) : ""}
+      <div class="nova">
+        <div class="card">
+          <div class="origem">${icone("notas")} Copiando a nota <strong style="color:var(--txt)">nº ${b.numero}</strong> de ${data(b.dhProc)} · ${brl(b.vServ)}</div>
+          <div class="secao">
+            <h3>Tomador</h3>
+            <div class="grade">
+              <label class="campo inteiro"><span>Cliente ${ajuda("Clientes que já receberam nota sua. Trocar o cliente muda a nota-base para a última nota dele.")}</span>
+                <select id="tomador">${tomadores.map(x => `<option value="${x.documento}" ${x.documento === b.tomaDoc ? "selected" : ""}>${esc(x.nome)} · ${doc(x.documento)}</option>`).join("")}</select></label>
+              <label class="campo"><span>E-mail ${ajuda(info.emailTomadorRemovido
+                  ? "Em homologação o e-mail da nota real não é usado, para o teste não chegar ao cliente. Se quiser, digite um e-mail seu."
+                  : "Veio da nota anterior. Se o cliente mudou de e-mail, corrija aqui: a nota nova sai com o e-mail novo e as próximas também.")}</span>
+                <input id="email" type="email" maxlength="80" value="${esc(s.emailTomador)}" placeholder="${info.emailTomadorRemovido ? "opcional: um e-mail seu para testar" : "sem e-mail"}"></label>
+              <label class="campo"><span>Telefone ${ajuda("Só números, com DDD (6 a 20 dígitos). Opcional.")}</span>
+                <input id="fone" inputmode="numeric" maxlength="20" value="${esc(s.foneTomador)}" placeholder="sem telefone"></label>
+            </div>
+          </div>
+          <div class="secao">
+            <h3>Valores</h3>
+            <div class="grade">
+              <label class="campo"><span>Competência ${ajuda("Data a que o serviço se refere. Define o mês em que os impostos são apurados. Não pode ser futura.")}</span>
+                <input id="dCompet" type="date" value="${s.dCompet}" max="${s.dCompet}"></label>
+              <label class="campo"><span>Valor do serviço (R$) ${ajuda("Valor bruto do serviço, antes de qualquer desconto.")}</span>
+                <input id="vServ" type="number" step="0.01" min="0.01" value="${s.vServ}"></label>
+              <label class="campo"><span>Desconto incondicionado (R$) ${ajuda("Desconto que não depende de condição futura (ex.: abatimento já negociado). Reduz a base de cálculo dos tributos. Use 0 se não houver.")}</span>
+                <input id="vDesc" type="number" step="0.01" min="0" value="${s.vDescIncond}"></label>
+              ${info.simples ? `<label class="campo"><span>% tributos do Simples ${ajuda("Percentual aproximado de tributos do Simples, exigido pela Lei da Transparência (12.741). É informativo e vem do contador. O app lembra o último valor usado.")}</span>
+                <input id="pct" type="number" step="0.01" min="0" value="${s.pTotTribSN ?? ""}" placeholder="pergunte ao contador"></label>` : ""}
+            </div>
+          </div>
+          <div class="secao">
+            <h3>Descrição do serviço ${ajuda("Texto que o tomador lê na nota. Seja específico se o cliente pedir (ex.: mês de referência, contrato).")}</h3>
+            <textarea id="descricao" rows="3">${esc(s.descricao)}</textarea>
+          </div>
+          <div class="secao herdado" title="Vem da nota nº ${b.numero} e não muda nesta tela">
+            <h3>Herdado da nota anterior</h3>
+            Serviço <b>${esc(b.cTribNac)} · ${esc(b.xTribNac)}</b> · Regime <b>${esc(t.regime)}</b><br>
+            Local da prestação <b>${esc(t.localPrestacao || "—")}</b> · ISS <b>${t.issRetido ? "retido pelo tomador" : "não retido (pago por você no Simples)"}</b>
+          </div>
+        </div>
 
-      <div class="heranca" title="Vem da nota nº ${b.numero} e não muda nesta tela">
-        <div><span>Base de cálculo</span><strong id="baseCalc"></strong></div>
-        <div><span>PIS ${t.pAliqPis != null ? pct(t.pAliqPis) : ""}</span><strong id="vPis">${t.pAliqPis == null ? "não informado" : ""}</strong></div>
-        <div><span>COFINS ${t.pAliqCofins != null ? pct(t.pAliqCofins) : ""}</span><strong id="vCofins">${t.pAliqCofins == null ? "não informado" : ""}</strong></div>
-        <div><span>ISS</span><strong>${t.issRetido ? "retido pelo tomador" : "não retido (pago por você no Simples)"}</strong></div>
-        <div><span>Regime</span><strong>${esc(t.regime)}</strong></div>
-        <div><span>Serviço</span><strong title="${esc(b.xTribNac)}">${esc(b.cTribNac)} · ${esc(b.xTribNac)}</strong></div>
-        <div><span>Local da prestação</span><strong>${esc(t.localPrestacao || "—")}</strong></div>
-        <div><span>Número ${ajuda("Série e número da DPS (Declaração de Prestação de Serviço). Sequência sua; o app usa o próximo depois do último já autorizado. O número da NFS-e é dado pela Sefin.")}</span><strong>Série ${info.serie} · DPS ${info.proximoNDps}</strong></div>
+        <div class="card card-corpo resumo">
+          <div class="linha"><span class="sub">Valor do serviço</span><span id="r-serv"></span></div>
+          <div class="linha"><span class="sub">Desconto</span><span id="r-desc"></span></div>
+          <div class="linha"><span class="sub">Base de cálculo</span><span id="r-base"></span></div>
+          ${t.pAliqPis != null ? `<div class="linha"><span class="sub">PIS ${pct(t.pAliqPis)}</span><span id="r-pis"></span></div>` : ""}
+          ${t.pAliqCofins != null ? `<div class="linha"><span class="sub">COFINS ${pct(t.pAliqCofins)}</span><span id="r-cofins"></span></div>` : ""}
+          <div class="linha"><span class="sub">ISS</span><span>${t.issRetido ? "retido" : "não retido"}</span></div>
+          <div class="total">
+            <div class="sub" style="font-size:12.5px">Valor líquido ${ajuda("Estimativa: valor do serviço menos o desconto. O valor oficial é calculado pela Sefin e aparece na nota.")}</div>
+            <div class="numero-grande" id="r-liq"></div>
+          </div>
+          <div class="meta">${pilulaAmb(estado.amb)}<br>Série ${info.serie} · DPS nº ${info.proximoNDps} ${ajuda("Número da Declaração de Prestação de Serviço: sequência sua; o app usa o próximo depois do último já autorizado. O número da NFS-e é dado pela Sefin.")}</div>
+          <button class="btn" id="revisar" title="Mostra o resumo completo para conferir. Ainda não emite.">Revisar e emitir</button>
+        </div>
       </div>
-      <div class="linha-acoes"><button class="btn" id="revisar" title="Mostra o resumo para conferir. Ainda não emite.">Revisar</button></div>
-    </div>
-    <div id="revisao"></div>`;
+    </div>`;
 
-  const campo = id => document.getElementById(id);
+  const campo = id => $(id);
   const baseDe = () => (+campo("vServ").value || 0) - (+campo("vDesc").value || 0);
   const imposto = aliq => Math.round(baseDe() * aliq) / 100;
-  const atualizarValores = () => {
-    campo("baseCalc").textContent = brl(baseDe());
-    if (t.pAliqPis != null) campo("vPis").textContent = brl(imposto(t.pAliqPis));
-    if (t.pAliqCofins != null) campo("vCofins").textContent = brl(imposto(t.pAliqCofins));
+  const atualizar = () => {
+    campo("r-serv").textContent = brl(+campo("vServ").value || 0);
+    campo("r-desc").textContent = "− " + brl(+campo("vDesc").value || 0);
+    campo("r-base").textContent = brl(baseDe());
+    if (t.pAliqPis != null) campo("r-pis").textContent = brl(imposto(t.pAliqPis));
+    if (t.pAliqCofins != null) campo("r-cofins").textContent = brl(imposto(t.pAliqCofins));
+    campo("r-liq").textContent = t.issRetido ? "pela Sefin" : brl(baseDe());
   };
-  ["vServ", "vDesc"].forEach(id => campo(id).oninput = atualizarValores);
-  atualizarValores();
+  ["vServ", "vDesc"].forEach(id => campo(id).oninput = atualizar);
+  atualizar();
   campo("tomador").onchange = () => telaNova(campo("tomador").value);
+  campo("revisar").onclick = () => abrirConfirmacao(info, prod, {
+    amb: estado.amb, baseChave: b.chave, dCompet: campo("dCompet").value,
+    vServ: +campo("vServ").value, vDescIncond: +campo("vDesc").value || 0,
+    descricao: campo("descricao").value,
+    emailTomador: campo("email").value.trim(), foneTomador: campo("fone").value.replace(/\D/g, ""),
+    pTotTribSN: info.simples ? (campo("pct").value === "" ? null : +campo("pct").value) : null,
+    confirmoProducao: false,
+  }, baseDe, imposto);
+}
 
-  campo("revisar").onclick = () => {
-    const dados = {
-      amb: estado.amb, baseChave: b.chave, dCompet: campo("dCompet").value,
-      vServ: +campo("vServ").value, vDescIncond: +campo("vDesc").value || 0,
-      descricao: campo("descricao").value,
-      emailTomador: campo("email").value.trim(), foneTomador: campo("fone").value.replace(/\D/g, ""),
-      pTotTribSN: info.simples ? (campo("pct").value === "" ? null : +campo("pct").value) : null,
-      confirmoProducao: false,
-    };
-    campo("revisao").innerHTML = `
-      <div class="card" style="border-color:${prod ? "var(--prod)" : "var(--hom)"}">
-        <h3 style="margin-top:0">Confira antes de emitir</h3>
-        <table class="resumo"><tbody>
-          <tr><td>Ambiente</td><td><span class="tag ${estado.amb}">${nomeAmb(estado.amb)}</span> ${prod ? "— gera NFS-e real, com valor fiscal" : "— teste, sem valor fiscal"}</td></tr>
-          <tr><td>Tomador</td><td>${esc(b.tomaNome)} · ${doc(b.tomaDoc)}</td></tr>
-          <tr><td>E-mail do tomador</td><td>${contato(esc(dados.emailTomador), t.emailTomador)}</td></tr>
-          <tr><td>Telefone do tomador</td><td>${contato(esc(dados.foneTomador), t.foneTomador)}</td></tr>
-          <tr><td>Competência</td><td>${data(dados.dCompet)}</td></tr>
-          <tr><td>Serviço</td><td>${esc(b.cTribNac)} · ${esc(b.xTribNac)}</td></tr>
-          <tr><td>Descrição</td><td>${esc(dados.descricao)}</td></tr>
-          <tr><td>Valor do serviço</td><td>${brl(dados.vServ)}</td></tr>
-          <tr><td>Desconto incondicionado</td><td>${brl(dados.vDescIncond)}</td></tr>
-          <tr><td>Base de cálculo</td><td>${brl(baseDe())}</td></tr>
-          ${t.pAliqPis != null ? `<tr><td>PIS (${pct(t.pAliqPis)}) / COFINS (${pct(t.pAliqCofins)})</td><td>${brl(imposto(t.pAliqPis))} / ${brl(imposto(t.pAliqCofins))}</td></tr>` : ""}
-          <tr><td>ISS</td><td>${t.issRetido ? "retido pelo tomador" : "não retido"}</td></tr>
-          ${info.simples ? `<tr><td>% tributos Simples</td><td>${dados.pTotTribSN != null ? pct(dados.pTotTribSN) : "—"}</td></tr>` : ""}
-          <tr><td>Valor líquido ${ajuda("Estimativa: valor do serviço menos o desconto. O valor oficial é calculado pela Sefin e aparece na nota.")}</td>
-            <td><strong>${t.issRetido ? "calculado pela Sefin (há retenção de ISS)" : brl(baseDe())}</strong></td></tr>
-        </tbody></table>
-        ${prod ? `<label style="margin-top:14px;display:flex;gap:8px;align-items:center;color:var(--txt);font-size:14px">
-          <input type="checkbox" id="confirmo" style="width:auto"> Confirmo: emitir esta NFS-e de verdade para ${esc(b.tomaNome)}</label>` : ""}
-        <div class="linha-acoes"><button class="btn" id="emitir" ${prod ? "disabled" : ""}
-          title="${prod ? "Envia para a Sefin e gera a NFS-e real. Marque a confirmação acima para liberar." : "Envia para o ambiente de teste da Sefin."}">Emitir em ${nomeAmb(estado.amb)}</button></div>
-        <div id="resultado"></div>
-      </div>`;
-    if (prod) campo("confirmo").onchange = () => campo("emitir").disabled = !campo("confirmo").checked;
-    campo("revisao").scrollIntoView({ behavior: "smooth" });
-    campo("emitir").onclick = async () => {
-      campo("emitir").disabled = true;
-      campo("emitir").textContent = "Enviando…";
-      dados.confirmoProducao = prod && campo("confirmo").checked;
-      try {
-        const r = await post("/api/emitir", dados);
-        campo("resultado").innerHTML = r.ok
-          ? mensagem("ok", `NFS-e nº <strong>${esc(r.numero)}</strong> autorizada em ${esc(r.ambiente)}.<br>Chave ${esc(r.chave)}
-              <div class="linha-acoes"><a class="btn sec" href="/api/notas/${r.chave}/xml?amb=${estado.amb}">XML</a>
-              <a class="btn sec" href="/api/notas/${r.chave}/pdf?amb=${estado.amb}" target="_blank">PDF</a></div>`)
-            + (r.alertas.length ? mensagem("info", "Alertas: " + r.alertas.map(esc).join("<br>")) : "")
-          : r.jaExistia
-          ? mensagem("erro", `O número de DPS ${r.nDps} já tinha virado a <strong>NFS-e nº ${r.jaExistia.numero}</strong>:
-              ${esc(r.jaExistia.tomaNome)}, ${brl(r.jaExistia.vServ)}, emitida em ${data(r.jaExistia.dhProc)}.<br>
-              Se essa é a nota que você queria (por exemplo, uma tentativa anterior que deu certo), <strong>não emita de novo</strong>.
-              Se é outra nota, clique em “Tentar de novo”: o app usa o número seguinte.`)
-          : mensagem("erro", `Rejeitada (DPS nº ${r.nDps}):<br>` + r.erros.map(esc).join("<br>"));
-        campo("emitir").textContent = r.ok ? "Emitida" : "Tentar de novo";
-        campo("emitir").disabled = r.ok;
-      } catch (e) {
-        campo("resultado").innerHTML = mensagem("erro", esc(e.message));
-        campo("emitir").textContent = "Tentar de novo";
-        campo("emitir").disabled = false;
+function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
+  const b = info.base, t = info.tributacao, dlg = $("confirmar");
+  const contato = (atual, antes) => esc(atual || "—") + (atual !== (antes || "") && !info.emailTomadorRemovido ? ` <span class="muted">(antes: ${esc(antes || "nenhum")})</span>` : "");
+  dlg.innerHTML = `
+    <div class="dlg-cab"><h2>Confirme a emissão</h2>${pilulaAmb(estado.amb)}</div>
+    <div class="dlg-corpo">
+      <div class="sub" style="margin-bottom:8px">${prod ? "Gera uma NFS-e real, com valor fiscal." : "Ambiente de teste: sem valor fiscal."}</div>
+      <table><tbody>
+        <tr><td>Tomador</td><td>${esc(b.tomaNome)}<div class="muted">${doc(b.tomaDoc)}</div></td></tr>
+        <tr><td>E-mail do tomador</td><td>${contato(dados.emailTomador, t.emailTomador)}</td></tr>
+        <tr><td>Telefone do tomador</td><td>${contato(dados.foneTomador, t.foneTomador)}</td></tr>
+        <tr><td>Competência</td><td>${data(dados.dCompet)}</td></tr>
+        <tr><td>Serviço</td><td>${esc(b.cTribNac)} · ${esc(b.xTribNac)}</td></tr>
+        <tr><td>Descrição</td><td>${esc(dados.descricao)}</td></tr>
+        <tr><td>Valor do serviço</td><td>${brl(dados.vServ)}</td></tr>
+        <tr><td>Desconto incondicionado</td><td>${brl(dados.vDescIncond)}</td></tr>
+        <tr><td>Base de cálculo</td><td>${brl(baseDe())}</td></tr>
+        ${t.pAliqPis != null ? `<tr><td>PIS (${pct(t.pAliqPis)}) / COFINS (${pct(t.pAliqCofins)})</td><td>${brl(imposto(t.pAliqPis))} / ${brl(imposto(t.pAliqCofins))}</td></tr>` : ""}
+        <tr><td>ISS</td><td>${t.issRetido ? "retido pelo tomador" : "não retido"}</td></tr>
+        ${info.simples ? `<tr><td>% tributos Simples</td><td>${dados.pTotTribSN != null ? pct(dados.pTotTribSN) : "—"}</td></tr>` : ""}
+        <tr class="destaque"><td>Valor líquido</td><td>${t.issRetido ? "calculado pela Sefin" : brl(baseDe())}</td></tr>
+      </tbody></table>
+    </div>
+    <!-- Fora da área que rola: a confirmação e o resultado ficam sempre à vista, junto dos botões. -->
+    <div class="dlg-acao">
+      ${prod ? `<label class="confirmo"><input type="checkbox" id="confirmo"> <span>Confirmo: emitir esta NFS-e <strong>de verdade</strong> para ${esc(b.tomaNome.replace(/\.$/, ""))}.</span></label>` : ""}
+      <div id="resultado"></div>
+    </div>
+    <div class="dlg-rodape">
+      <button class="btn sec" id="fechar">Cancelar</button>
+      <button class="btn" id="emitir" ${prod ? "disabled" : ""} title="${prod ? "Envia para a Sefin e gera a NFS-e real. Marque a confirmação para liberar." : "Envia para o ambiente de teste da Sefin."}">Emitir em ${nomeAmb(estado.amb)}</button>
+    </div>`;
+  dlg.showModal();
+  $("fechar").onclick = () => dlg.close();
+  if (prod) $("confirmo").onchange = () => $("emitir").disabled = !$("confirmo").checked;
+  $("emitir").onclick = async () => {
+    const botao = $("emitir");
+    botao.disabled = true;
+    botao.textContent = "Enviando…";
+    dados.confirmoProducao = prod && $("confirmo").checked;
+    try {
+      const r = await post("/api/emitir", dados);
+      if (r.ok) {
+        dlg.innerHTML = `
+          <div class="dlg-cab"><h2>Nota autorizada</h2>${pilulaAmb(estado.amb)}</div>
+          <div class="dlg-corpo">
+            <div class="numero-grande" style="font-size:34px;font-weight:600">NFS-e nº ${esc(r.numero)}</div>
+            <div class="sub" style="margin:4px 0 14px">${esc(b.tomaNome)} · ${brl(dados.vServ)}</div>
+            <div class="muted" style="font-size:12px;word-break:break-all">Chave ${esc(r.chave)}</div>
+            ${r.alertas.length ? `<div style="margin-top:12px">${mensagem("info", "Alertas: " + r.alertas.map(esc).join("<br>"))}</div>` : ""}
+          </div>
+          <div class="dlg-rodape">
+            <a class="btn sec" href="/api/notas/${r.chave}/xml?amb=${estado.amb}">${icone("baixar")} XML</a>
+            <a class="btn sec" href="/api/notas/${r.chave}/pdf?amb=${estado.amb}" target="_blank">${icone("pdf")} PDF</a>
+            <button class="btn" id="ver-notas">Ver notas</button>
+          </div>`;
+        $("ver-notas").onclick = () => { dlg.close(); mostrar("notas"); };
+        return;
       }
-    };
+      $("resultado").innerHTML = r.jaExistia
+        ? mensagem("erro", `O número de DPS ${r.nDps} já tinha virado a <strong>NFS-e nº ${r.jaExistia.numero}</strong>:
+            ${esc(r.jaExistia.tomaNome)}, ${brl(r.jaExistia.vServ)}, emitida em ${data(r.jaExistia.dhProc)}.<br>
+            Se essa é a nota que você queria (por exemplo, uma tentativa anterior que deu certo), <strong>não emita de novo</strong>.
+            Se é outra nota, clique em “Tentar de novo”: o app usa o número seguinte.`)
+        : mensagem("erro", `Rejeitada (DPS nº ${r.nDps}):<br>` + r.erros.map(esc).join("<br>"));
+      botao.textContent = "Tentar de novo";
+      botao.disabled = prod && !$("confirmo").checked;
+    } catch (e) {
+      $("resultado").innerHTML = mensagem("erro", esc(e.message));
+      botao.textContent = "Tentar de novo";
+      botao.disabled = prod && !$("confirmo").checked;
+    }
   };
 }
 
-// ---------- tema ----------
-const ICONE_SOL = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-  <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>`;
-const ICONE_LUA = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>`;
-
-function aplicarTema(tema) {
-  document.documentElement.dataset.tema = tema;
-  const botao = document.getElementById("tema");
-  botao.innerHTML = tema === "escuro" ? ICONE_SOL : ICONE_LUA;
-  botao.title = tema === "escuro" ? "Mudar para tema claro" : "Mudar para tema escuro";
-  // Na janela do app, a barra de título acompanha essa cor.
-  document.querySelector('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue("--card").trim();
-}
-document.getElementById("tema").onclick = () => {
-  const novo = document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro";
-  try { localStorage.setItem("tema", novo); } catch { }
-  aplicarTema(novo);
-};
-aplicarTema(document.documentElement.dataset.tema);
-
-// ---------- início ----------
-function montarRodape() {
-  const i = estado.info, pasta = i.pastaDados + (estado.perfil ? "\\" + estado.perfil.documento : "");
-  document.getElementById("rodape").innerHTML = `
-    ${esc(i.nome)} v${esc(i.versao)} ·
-    <span title="Notas, cancelamentos e tomadores vêm do Sistema Nacional da NFS-e (Sefin e ADN) pelo seu certificado. Nada é cadastrado à mão.">
-      Dados: Ambiente Nacional da NFS-e</span> ·
-    <span title="Cópia local do que já foi baixado ou emitido (XMLs e o % do Simples). Pode apagar: o app baixa tudo de novo.">
-      Cópia local em <code>${esc(pasta)}</code></span>`;
-}
-
+// ---------- início do app ----------
 async function iniciar() {
-  montarTopo();
-  montarRodape();
+  montarLateral();
   await sincronizarQuieto(estado.amb);
   mostrar(estado.tela);
 }
@@ -454,11 +873,9 @@ async function iniciar() {
 (async () => {
   estado.info = await api("/api/info");
   document.title = estado.info.nome;
-  document.getElementById("marca").textContent = estado.info.nome;
   if (estado.info.temHomologacao) {
     try { estado.amb = localStorage.getItem("amb") === "prod" ? "prod" : "hom"; } catch { estado.amb = "hom"; }
   }
-  montarRodape();
   try { estado.perfil = await api("/api/sessao"); iniciar(); }
   catch { telaLogin(); }
 })();
