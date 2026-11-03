@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Sem janela de console: o app aparece só como a janela da página. -->
+    <OutputType>WinExe</OutputType>
+    <!-- Gerado por tools/gerar_icone.py -->
+    <ApplicationIcon>assets\icone.ico</ApplicationIcon>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>NfseApp-Teste</AssemblyName>
+    <RootNamespace>NfseApp</RootNamespace>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+
+  <!-- Edição do dia a dia: dotnet publish -p:SoProducao=true (ver Edicao.cs) -->
+  <PropertyGroup Condition="'$(SoProducao)' == 'true'">
+    <AssemblyName>NfseApp</AssemblyName>
+    <DefineConstants>$(DefineConstants);SO_PRODUCAO</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.5" />
+  </ItemGroup>
+
+  <!-- A página vai embutida no .exe: um arquivo só para distribuir. -->
+  <ItemGroup>
+    <Content Remove="wwwroot\**" />
+    <EmbeddedResource Include="wwwroot\**" LogicalName="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

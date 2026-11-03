@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFS-e</title>
+<link rel="icon" href="/icone.png">
+<meta name="theme-color" content="#ffffff">
+<script>
+  // Aplica o tema antes de pintar a página, para não piscar claro → escuro.
+  (() => {
+    let tema = null;
+    try { tema = localStorage.getItem("tema"); } catch { }
+    if (tema !== "claro" && tema !== "escuro") tema = matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro";
+    document.documentElement.dataset.tema = tema;
+  })();
+</script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6fa; --card: #ffffff; --txt: #172033; --sub: #5d6880; --linha: #e2e7ef; --campo: #f7f9fc;
+    --pri: #2563eb; --pri-hover: #1d4ed8; --pri-txt: #fff; --ok: #15803d; --erro: #b42318; --prod: #c2410c; --hom: #a16207;
+    --sombra: 0 1px 2px rgb(16 24 40 / .05), 0 1px 3px rgb(16 24 40 / .06);
+  }
+  :root[data-tema="escuro"] {
+    color-scheme: dark;
+    --bg: #0f1420; --card: #171e2c; --txt: #e7ebf3; --sub: #94a0b8; --linha: #263045; --campo: #111827;
+    --pri: #5b8cff; --pri-hover: #7aa2ff; --pri-txt: #0b1220; --ok: #4ade80; --erro: #f87171; --prod: #fb923c; --hom: #facc15;
+    --sombra: 0 1px 2px rgb(0 0 0 / .3);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--txt); transition: background .2s, color .2s; }
+  header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--linha); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  header h1 img { width: 26px; height: 26px; }
+  #tema { background: none; border: 1px solid var(--linha); color: var(--sub); width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: inline-grid; place-items: center; padding: 0; }
+  #tema:hover { color: var(--txt); border-color: var(--sub); }
+  nav { display: flex; gap: 4px; }
+  nav button { background: none; border: 0; padding: 8px 12px; border-radius: 6px; color: var(--sub); cursor: pointer; font: inherit; }
+  nav button.ativo { background: var(--bg); color: var(--txt); font-weight: 600; }
+  .direita { margin-left: auto; display: flex; align-items: center; gap: 12px; color: var(--sub); }
+  main { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--linha); border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: var(--sombra); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--linha); vertical-align: top; }
+  th { color: var(--sub); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.cancelada td { color: var(--sub); text-decoration: line-through; }
+  tr.cancelada td.acoes, tr.cancelada td.sit { text-decoration: none; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid currentColor; }
+  .tag.prod { color: var(--prod); } .tag.hom { color: var(--hom); } .tag.ok { color: var(--ok); } .tag.canc { color: var(--erro); }
+  button.btn, a.btn { background: var(--pri); color: var(--pri-txt); border: 0; padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 600; text-decoration: none; display: inline-block; white-space: nowrap; }
+  button.btn:hover:not(:disabled), a.btn:hover { background: var(--pri-hover); }
+  button.sec, a.sec { background: none; color: var(--pri); border: 1px solid var(--linha); padding: 4px 10px; font-weight: 500; }
+  button.sec:hover:not(:disabled), a.sec:hover { background: none; border-color: var(--pri); }
+  button:disabled { opacity: .5; cursor: default; }
+  select, input, textarea { font: inherit; padding: 7px 9px; border: 1px solid var(--linha); border-radius: 8px; background: var(--campo); color: var(--txt); width: 100%; }
+  select:focus, input:focus, textarea:focus { outline: 2px solid var(--pri); outline-offset: -1px; }
+  label { display: block; color: var(--sub); font-size: 12px; margin-bottom: 4px; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .linha-acoes { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+  .msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; border: 1px solid; }
+  .msg.erro { color: var(--erro); } .msg.ok { color: var(--ok); } .msg.info { color: var(--sub); }
+  .sub { color: var(--sub); }
+  .certs { display: grid; gap: 10px; }
+  .cert { text-align: left; background: var(--card); border: 1px solid var(--linha); border-radius: 10px; padding: 14px; cursor: pointer; font: inherit; color: inherit; }
+  .cert:hover { border-color: var(--pri); }
+  .resumo td:first-child { color: var(--sub); width: 40%; }
+  .rolagem { overflow-x: auto; }
+  .oculto { display: none !important; }
+  .ajuda { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 4px; border-radius: 50%;
+           border: 1px solid var(--sub); color: var(--sub); font-size: 10px; font-weight: 600; cursor: help; vertical-align: 1px; }
+  th[title] { cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .heranca { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 18px; margin-top: 16px;
+             padding: 12px 14px; border: 1px dashed var(--linha); border-radius: 10px; }
+  .heranca > div > span { display: block; color: var(--sub); font-size: 12px; }
+  footer { max-width: 1100px; margin: 0 auto 24px; padding: 0 16px; color: var(--sub); font-size: 12px; }
+  footer code { font-family: inherit; background: var(--card); border: 1px solid var(--linha); border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><img src="/icone.png" alt=""><span id="marca">NFS-e</span></h1>
+  <nav id="menu" class="oculto">
+    <button data-tela="notas">Notas</button>
+    <button data-tela="tomadores">Tomadores</button>
+    <button data-tela="nova">Nova nota</button>
+  </nav>
+  <div class="direita"><span class="direita" id="topo-sessao"></span><button id="tema"></button></div>
+</header>
+
+<main id="app"></main>
+<footer id="rodape"></footer>
+
+<script>
+const estado = { perfil: null, info: null, amb: "prod", tela: "notas", filtro: "emitidas", ultimaSync: null };
+const app = document.getElementById("app");
+
+const brl = v => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const data = s => s ? new Date(s.length === 10 ? s + "T12:00:00" : s).toLocaleDateString("pt-BR") : "";
+const doc = d => d.length === 14 ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+                : d.length === 11 ? d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4") : d;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const nomeAmb = a => a === "prod" ? "Produção" : "Homologação";
+
+async function api(caminho, opcoes = {}) {
+  const r = await fetch(caminho, { ...opcoes, headers: { "Content-Type": "application/json", "X-NfseApp": "1", ...(opcoes.headers || {}) } });
+  const corpo = r.headers.get("content-type")?.includes("json") ? await r.json() : await r.text();
+  if (!r.ok) throw new Error(corpo?.erro || corpo || ("HTTP " + r.status));
+  return corpo;
+}
+const post = (caminho, corpo) => api(caminho, { method: "POST", body: JSON.stringify(corpo || {}) });
+
+const pct = v => Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
+const hora = d => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+const ajuda = texto => `<span class="ajuda" title="${esc(texto)}">?</span>`;
+
+function mensagem(tipo, texto) { return `<div class="msg ${tipo}">${texto}</div>`; }
+function carregando(texto) { app.innerHTML = `<div class="card sub">${esc(texto)}…</div>`; }
+
+// ---------- login ----------
+async function telaLogin(erro) {
+  document.getElementById("menu").classList.add("oculto");
+  document.getElementById("topo-sessao").innerHTML = "";
+  carregando("Procurando certificados instalados");
+  const certs = await api("/api/certificados");
+  app.innerHTML = `
+    <div class="card" style="max-width:640px;margin:40px auto">
+      <h2 style="margin-top:0">Entrar com certificado digital</h2>
+      <p class="sub">Escolha o certificado ICP-Brasil (e-CNPJ) instalado neste computador. A chave nunca sai da sua máquina.</p>
+      ${erro ? mensagem("erro", esc(erro)) : ""}
+      ${certs.length ? "" : mensagem("info", "Nenhum certificado ICP-Brasil válido encontrado no Windows (Certificados do usuário → Pessoal).")}
+      <div class="certs">
+        ${certs.map(c => `
+          <button class="cert" data-thumb="${esc(c.thumbprint)}">
+            <strong>${esc(c.nome)}</strong><br>
+            <span class="sub">${c.tipoDocumento} ${doc(c.documento)} · válido até ${data(c.validade)} · ${esc(c.emissor)}</span>
+          </button>`).join("")}
+      </div>
+    </div>`;
+  app.querySelectorAll(".cert").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { estado.perfil = await post("/api/login", { thumbprint: b.dataset.thumb }); iniciar(); }
+    catch (e) { telaLogin(e.message); }
+  });
+}
+
+function montarTopo() {
+  const p = estado.perfil;
+  document.getElementById("menu").classList.remove("oculto");
+  const temHom = estado.info.temHomologacao;
+  document.getElementById("topo-sessao").innerHTML = `
+    <span title="Certificado em uso">${esc(p.nome)} · ${doc(p.documento)}</span>
+    ${temHom ? `<select id="amb" style="width:auto" title="Homologação: ambiente de teste da Receita, notas sem valor fiscal. Produção: notas reais.">
+      <option value="hom">Homologação (teste)</option>
+      <option value="prod">Produção (vale de verdade)</option>
+    </select>` : ""}
+    <span class="tag ${estado.amb}" title="${estado.amb === "prod" ? "Notas emitidas aqui são reais, com valor fiscal" : "Ambiente de teste: nada aqui tem valor fiscal"}">${nomeAmb(estado.amb)}</span>
+    <button class="btn sec" id="sair" title="Sair e escolher outro certificado">Sair</button>`;
+  if (temHom) {
+    const sel = document.getElementById("amb");
+    sel.value = estado.amb;
+    sel.onchange = async () => {
+      estado.amb = sel.value;
+      try { localStorage.setItem("amb", estado.amb); } catch { }
+      montarTopo();
+      await sincronizarQuieto(estado.amb);
+      mostrar(estado.tela);
+    };
+  }
+  document.getElementById("sair").onclick = async () => { await post("/api/logout"); estado.perfil = null; montarRodape(); telaLogin(); };
+  document.querySelectorAll("#menu button").forEach(b => {
+    b.classList.toggle("ativo", b.dataset.tela === estado.tela);
+    b.onclick = () => mostrar(b.dataset.tela);
+  });
+}
+
+function mostrar(tela, parametro) {
+  estado.tela = tela;
+  document.querySelectorAll("#menu button").forEach(b => b.classList.toggle("ativo", b.dataset.tela === tela));
+  ({ notas: telaNotas, tomadores: telaTomadores, nova: telaNova })[tela](parametro);
+}
+
+// ---------- notas ----------
+async function telaNotas(aviso) {
+  carregando("Carregando notas");
+  const { emitidas, recebidas } = await api(`/api/notas?amb=${estado.amb}`);
+  const lista = estado.filtro === "emitidas" ? emitidas : recebidas;
+  const outra = estado.filtro === "emitidas" ? "toma" : "prest";
+  const ativas = lista.filter(n => !n.cancelada);
+  app.innerHTML = `
+    ${aviso || ""}
+    <div class="card">
+      <div class="linha-acoes" style="margin-top:0;margin-bottom:12px">
+        <select id="filtro" style="width:auto" title="Emitidas: notas em que você é o prestador. Recebidas: notas de serviços que você contratou.">
+          <option value="emitidas">Emitidas por mim (${emitidas.length})</option>
+          <option value="recebidas">Recebidas (${recebidas.length})</option>
+        </select>
+        <span class="tag ${estado.amb}">${nomeAmb(estado.amb)}</span>
+        <span class="sub" style="margin-left:auto">${estado.ultimaSync ? "Atualizado às " + hora(estado.ultimaSync) : ""}</span>
+        <button class="btn sec" id="sync" title="Busca no Ambiente de Dados Nacional (ADN) as notas e cancelamentos novos deste CNPJ">Atualizar do ADN</button>
+      </div>
+      ${lista.length ? `
+      <div class="rolagem"><table>
+        <thead><tr><th>Nº</th>
+          <th title="Data e hora em que a Sefin autorizou a nota">Emissão</th>
+          <th title="Data a que o serviço se refere; define o mês de apuração dos impostos">Competência</th>
+          <th>${estado.filtro === "emitidas" ? "Tomador" : "Prestador"}</th>
+          <th class="num" title="Valor bruto do serviço, antes de descontos">Valor serviço</th>
+          <th class="num" title="Valor a receber: serviço menos descontos e retenções">Líquido</th>
+          <th>Situação</th><th></th></tr></thead>
+        <tbody>
+        ${lista.map(n => `
+          <tr class="${n.cancelada ? "cancelada" : ""}">
+            <td title="Chave de acesso: ${n.chave}">${n.numero}</td><td>${data(n.dhProc)}</td><td>${data(n.competencia)}</td>
+            <td>${esc(n[outra + "Nome"])}<br><span class="sub">${doc(n[outra + "Doc"])}</span></td>
+            <td class="num">${brl(n.vServ)}</td><td class="num">${brl(n.vLiq)}</td>
+            <td class="sit">${n.cancelada
+              ? `<span class="tag canc" title="Motivo do cancelamento: ${esc(n.motivoCancelamento)}">Cancelada</span>`
+              : `<span class="tag ok" title="Autorizada pela Sefin e válida">Autorizada</span>`}</td>
+            <td class="acoes" style="white-space:nowrap">
+              <a class="btn sec" href="/api/notas/${n.chave}/xml?amb=${estado.amb}" title="Baixar o XML oficial da nota (o documento fiscal em si)">XML</a>
+              <a class="btn sec" href="/api/notas/${n.chave}/pdf?amb=${estado.amb}" target="_blank" title="Abrir o DANFSe: o PDF da nota, gerado pelo Ambiente Nacional">PDF</a>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+        <tfoot><tr><td colspan="4" class="sub">${ativas.length} autorizada(s)${lista.length > ativas.length ? `, ${lista.length - ativas.length} cancelada(s) fora do total` : ""}</td>
+          <td class="num"><strong>${brl(ativas.reduce((s, n) => s + n.vServ, 0))}</strong></td>
+          <td class="num"><strong>${brl(ativas.reduce((s, n) => s + n.vLiq, 0))}</strong></td><td colspan="2"></td></tr></tfoot>
+      </table></div>` : `<p class="sub">Nenhuma nota ${estado.filtro} neste ambiente. Clique em “Atualizar do ADN” para buscar.</p>`}
+    </div>`;
+  const f = document.getElementById("filtro");
+  f.value = estado.filtro;
+  f.onchange = () => { estado.filtro = f.value; telaNotas(); };
+  document.getElementById("sync").onclick = () => sincronizar(estado.amb, telaNotas);
+}
+
+async function sincronizar(amb, depois) {
+  carregando("Buscando notas no Ambiente Nacional");
+  try {
+    const r = await post(`/api/sincronizar?amb=${amb}`);
+    estado.ultimaSync = new Date();
+    depois(mensagem("ok", r.novos ? `${r.novos} documento(s) novo(s) baixado(s).` : "Tudo em dia: nenhum documento novo."));
+  }
+  catch (e) { depois(mensagem("erro", esc(e.message))); }
+}
+
+// Ao entrar (e ao trocar de ambiente) já busca o que chegou de novo, sem o usuário precisar lembrar.
+async function sincronizarQuieto(amb) {
+  carregando("Buscando notas novas no Ambiente Nacional");
+  const ambientes = amb === "prod" ? ["prod"] : ["prod", amb]; // tomadores e notas-base vêm sempre da produção
+  try { for (const a of ambientes) await post(`/api/sincronizar?amb=${a}`); estado.ultimaSync = new Date(); }
+  catch { /* sem rede: a tela mostra o que já está salvo e o botão "Atualizar do ADN" continua lá */ }
+}
+
+// ---------- tomadores ----------
+async function telaTomadores() {
+  carregando("Carregando tomadores");
+  const tomadores = await api("/api/tomadores");
+  app.innerHTML = `
+    <div class="card">
+      <p class="sub" style="margin-top:0">Os tomadores não são cadastrados no app: saem das notas que você já emitiu em produção
+        (canceladas não contam), com nome e e-mail da nota mais recente.
+        Para um cliente novo, emita a primeira nota no Emissor Nacional; depois ele aparece aqui.</p>
+      ${tomadores.length ? `
+      <div class="rolagem"><table>
+        <thead><tr><th>Tomador</th><th title="E-mail informado na nota mais recente para esse cliente">E-mail</th>
+          <th class="num">Notas</th><th class="num" title="Soma do valor dos serviços das notas autorizadas">Total faturado</th><th>Última nota</th><th></th></tr></thead>
+        <tbody>
+        ${tomadores.map(t => `
+          <tr>
+            <td>${esc(t.nome)}<br><span class="sub">${doc(t.documento)}</span></td>
+            <td>${t.email ? esc(t.email) : `<span class="sub">—</span>`}</td>
+            <td class="num">${t.notas}</td><td class="num">${brl(t.total)}</td>
+            <td>nº ${t.ultimoNumero} · ${data(t.ultimaData)} · ${brl(t.ultimoValor)}</td>
+            <td><button class="btn sec" data-doc="${t.documento}" title="Preparar uma nota nova copiando a última nota desse tomador">Nova nota</button></td>
+          </tr>`).join("")}
+        </tbody>
+      </table></div>` : `<p class="sub">Nenhum tomador ainda: não há notas emitidas em produção neste CNPJ.</p>`}
+    </div>`;
+  app.querySelectorAll("button[data-doc]").forEach(b => b.onclick = () => mostrar("nova", b.dataset.doc));
+}
+
+// ---------- nova nota ----------
+async function telaNova(tomador) {
+  carregando("Buscando a última nota para copiar");
+  let info, tomadores;
+  try {
+    [tomadores, info] = await Promise.all([
+      api("/api/tomadores"),
+      api(`/api/nova?amb=${estado.amb}${tomador ? "&tomador=" + tomador : ""}`),
+    ]);
+  } catch (e) { app.innerHTML = mensagem("erro", esc(e.message)); return; }
+  const b = info.base, s = info.sugestao, t = info.tributacao;
+  const prod = estado.amb === "prod";
+  const emailTomador = info.emailTomadorRemovido ? "não vai na nota de teste (para não chegar ao cliente)" : (t.emailTomador || "nenhum na nota");
+  app.innerHTML = `
+    ${info.aviso ? mensagem("erro", esc(info.aviso)) : ""}
+    <div class="card">
+      <h2 style="margin-top:0">Nova nota <span class="tag ${estado.amb}">${nomeAmb(estado.amb)}</span></h2>
+      <p class="sub">Copiando a nota <strong>nº ${b.numero}</strong> de ${data(b.dhProc)} (${brl(b.vServ)}). Mesmo tomador, serviço e tributação; ajuste o que mudou.</p>
+      <div class="grade">
+        <div><label>Tomador ${ajuda("Clientes que já receberam nota sua. Trocar o tomador muda a nota-base para a última nota dele.")}</label>
+          <select id="tomador">${tomadores.map(x => `<option value="${x.documento}" ${x.documento === b.tomaDoc ? "selected" : ""}>${esc(x.nome)} · ${doc(x.documento)}</option>`).join("")}</select></div>
+        <div><label>Competência ${ajuda("Data a que o serviço se refere. Define o mês em que os impostos são apurados. Não pode ser futura.")}</label>
+          <input id="dCompet" type="date" value="${s.dCompet}" max="${s.dCompet}"></div>
+        <div><label>Valor do serviço (R$) ${ajuda("Valor bruto do serviço, antes de qualquer desconto.")}</label>
+          <input id="vServ" type="number" step="0.01" min="0.01" value="${s.vServ}"></div>
+        <div><label>Desconto incondicionado (R$) ${ajuda("Desconto que não depende de condição futura (ex.: abatimento já negociado). Reduz a base de cálculo dos tributos. Use 0 se não houver.")}</label>
+          <input id="vDesc" type="number" step="0.01" min="0" value="${s.vDescIncond}"></div>
+        ${info.simples ? `<div><label>% tributos do Simples Nacional ${ajuda("Percentual aproximado de tributos do Simples, exigido pela Lei da Transparência (12.741). É informativo e vem do contador. O app lembra o último valor usado.")}</label>
+          <input id="pct" type="number" step="0.01" min="0" value="${s.pTotTribSN ?? ""}" placeholder="pergunte ao contador"></div>` : ""}
+      </div>
+      <div style="margin-top:14px"><label>Descrição do serviço ${ajuda("Texto que o tomador lê na nota. Seja específico se o cliente pedir (ex.: mês de referência, contrato).")}</label>
+        <textarea id="descricao" rows="2">${esc(s.descricao)}</textarea></div>
+
+      <div class="heranca" title="Vem da nota nº ${b.numero} e não muda nesta tela">
+        <div><span>Base de cálculo</span><strong id="baseCalc"></strong></div>
+        <div><span>PIS ${t.pAliqPis != null ? pct(t.pAliqPis) : ""}</span><strong id="vPis">${t.pAliqPis == null ? "não informado" : ""}</strong></div>
+        <div><span>COFINS ${t.pAliqCofins != null ? pct(t.pAliqCofins) : ""}</span><strong id="vCofins">${t.pAliqCofins == null ? "não informado" : ""}</strong></div>
+        <div><span>ISS</span><strong>${t.issRetido ? "retido pelo tomador" : "não retido (pago por você no Simples)"}</strong></div>
+        <div><span>Regime</span><strong>${esc(t.regime)}</strong></div>
+        <div><span>Serviço</span><strong title="${esc(b.xTribNac)}">${esc(b.cTribNac)} · ${esc(b.xTribNac)}</strong></div>
+        <div><span>Local da prestação</span><strong>${esc(t.localPrestacao || "—")}</strong></div>
+        <div><span>E-mail do tomador</span><strong>${esc(emailTomador)}</strong></div>
+        <div><span>Número ${ajuda("Série e número da DPS (Declaração de Prestação de Serviço). Sequência sua; o app usa o próximo depois do último já autorizado. O número da NFS-e é dado pela Sefin.")}</span><strong>Série ${info.serie} · DPS ${info.proximoNDps}</strong></div>
+      </div>
+      <div class="linha-acoes"><button class="btn" id="revisar" title="Mostra o resumo para conferir. Ainda não emite.">Revisar</button></div>
+    </div>
+    <div id="revisao"></div>`;
+
+  const campo = id => document.getElementById(id);
+  const baseDe = () => (+campo("vServ").value || 0) - (+campo("vDesc").value || 0);
+  const imposto = aliq => Math.round(baseDe() * aliq) / 100;
+  const atualizarValores = () => {
+    campo("baseCalc").textContent = brl(baseDe());
+    if (t.pAliqPis != null) campo("vPis").textContent = brl(imposto(t.pAliqPis));
+    if (t.pAliqCofins != null) campo("vCofins").textContent = brl(imposto(t.pAliqCofins));
+  };
+  ["vServ", "vDesc"].forEach(id => campo(id).oninput = atualizarValores);
+  atualizarValores();
+  campo("tomador").onchange = () => telaNova(campo("tomador").value);
+
+  campo("revisar").onclick = () => {
+    const dados = {
+      amb: estado.amb, baseChave: b.chave, dCompet: campo("dCompet").value,
+      vServ: +campo("vServ").value, vDescIncond: +campo("vDesc").value || 0,
+      descricao: campo("descricao").value, pTotTribSN: info.simples ? (campo("pct").value === "" ? null : +campo("pct").value) : null,
+      confirmoProducao: false,
+    };
+    campo("revisao").innerHTML = `
+      <div class="card" style="border-color:${prod ? "var(--prod)" : "var(--hom)"}">
+        <h3 style="margin-top:0">Confira antes de emitir</h3>
+        <table class="resumo"><tbody>
+          <tr><td>Ambiente</td><td><span class="tag ${estado.amb}">${nomeAmb(estado.amb)}</span> ${prod ? "— gera NFS-e real, com valor fiscal" : "— teste, sem valor fiscal"}</td></tr>
+          <tr><td>Tomador</td><td>${esc(b.tomaNome)} · ${doc(b.tomaDoc)}</td></tr>
+          <tr><td>E-mail do tomador</td><td>${esc(emailTomador)}</td></tr>
+          <tr><td>Competência</td><td>${data(dados.dCompet)}</td></tr>
+          <tr><td>Serviço</td><td>${esc(b.cTribNac)} · ${esc(b.xTribNac)}</td></tr>
+          <tr><td>Descrição</td><td>${esc(dados.descricao)}</td></tr>
+          <tr><td>Valor do serviço</td><td>${brl(dados.vServ)}</td></tr>
+          <tr><td>Desconto incondicionado</td><td>${brl(dados.vDescIncond)}</td></tr>
+          <tr><td>Base de cálculo</td><td>${brl(baseDe())}</td></tr>
+          ${t.pAliqPis != null ? `<tr><td>PIS (${pct(t.pAliqPis)}) / COFINS (${pct(t.pAliqCofins)})</td><td>${brl(imposto(t.pAliqPis))} / ${brl(imposto(t.pAliqCofins))}</td></tr>` : ""}
+          <tr><td>ISS</td><td>${t.issRetido ? "retido pelo tomador" : "não retido"}</td></tr>
+          ${info.simples ? `<tr><td>% tributos Simples</td><td>${dados.pTotTribSN != null ? pct(dados.pTotTribSN) : "—"}</td></tr>` : ""}
+          <tr><td>Valor líquido ${ajuda("Estimativa: valor do serviço menos o desconto. O valor oficial é calculado pela Sefin e aparece na nota.")}</td>
+            <td><strong>${t.issRetido ? "calculado pela Sefin (há retenção de ISS)" : brl(baseDe())}</strong></td></tr>
+        </tbody></table>
+        ${prod ? `<label style="margin-top:14px;display:flex;gap:8px;align-items:center;color:var(--txt);font-size:14px">
+          <input type="checkbox" id="confirmo" style="width:auto"> Confirmo: emitir esta NFS-e de verdade para ${esc(b.tomaNome)}</label>` : ""}
+        <div class="linha-acoes"><button class="btn" id="emitir" ${prod ? "disabled" : ""}
+          title="${prod ? "Envia para a Sefin e gera a NFS-e real. Marque a confirmação acima para liberar." : "Envia para o ambiente de teste da Sefin."}">Emitir em ${nomeAmb(estado.amb)}</button></div>
+        <div id="resultado"></div>
+      </div>`;
+    if (prod) campo("confirmo").onchange = () => campo("emitir").disabled = !campo("confirmo").checked;
+    campo("revisao").scrollIntoView({ behavior: "smooth" });
+    campo("emitir").onclick = async () => {
+      campo("emitir").disabled = true;
+      campo("emitir").textContent = "Enviando…";
+      dados.confirmoProducao = prod && campo("confirmo").checked;
+      try {
+        const r = await post("/api/emitir", dados);
+        campo("resultado").innerHTML = r.ok
+          ? mensagem("ok", `NFS-e nº <strong>${esc(r.numero)}</strong> autorizada em ${esc(r.ambiente)}.<br>Chave ${esc(r.chave)}
+              <div class="linha-acoes"><a class="btn sec" href="/api/notas/${r.chave}/xml?amb=${estado.amb}">XML</a>
+              <a class="btn sec" href="/api/notas/${r.chave}/pdf?amb=${estado.amb}" target="_blank">PDF</a></div>`)
+            + (r.alertas.length ? mensagem("info", "Alertas: " + r.alertas.map(esc).join("<br>")) : "")
+          : r.jaExistia
+          ? mensagem("erro", `O número de DPS ${r.nDps} já tinha virado a <strong>NFS-e nº ${r.jaExistia.numero}</strong>:
+              ${esc(r.jaExistia.tomaNome)}, ${brl(r.jaExistia.vServ)}, emitida em ${data(r.jaExistia.dhProc)}.<br>
+              Se essa é a nota que você queria (por exemplo, uma tentativa anterior que deu certo), <strong>não emita de novo</strong>.
+              Se é outra nota, clique em “Tentar de novo”: o app usa o número seguinte.`)
+          : mensagem("erro", `Rejeitada (DPS nº ${r.nDps}):<br>` + r.erros.map(esc).join("<br>"));
+        campo("emitir").textContent = r.ok ? "Emitida" : "Tentar de novo";
+        campo("emitir").disabled = r.ok;
+      } catch (e) {
+        campo("resultado").innerHTML = mensagem("erro", esc(e.message));
+        campo("emitir").textContent = "Tentar de novo";
+        campo("emitir").disabled = false;
+      }
+    };
+  };
+}
+
+// ---------- tema ----------
+const ICONE_SOL = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+  <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>`;
+const ICONE_LUA = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>`;
+
+function aplicarTema(tema) {
+  document.documentElement.dataset.tema = tema;
+  const botao = document.getElementById("tema");
+  botao.innerHTML = tema === "escuro" ? ICONE_SOL : ICONE_LUA;
+  botao.title = tema === "escuro" ? "Mudar para tema claro" : "Mudar para tema escuro";
+  // Na janela do app, a barra de título acompanha essa cor.
+  document.querySelector('meta[name="theme-color"]').content = getComputedStyle(document.documentElement).getPropertyValue("--card").trim();
+}
+document.getElementById("tema").onclick = () => {
+  const novo = document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro";
+  try { localStorage.setItem("tema", novo); } catch { }
+  aplicarTema(novo);
+};
+aplicarTema(document.documentElement.dataset.tema);
+
+// ---------- início ----------
+function montarRodape() {
+  const i = estado.info, pasta = i.pastaDados + (estado.perfil ? "\\" + estado.perfil.documento : "");
+  document.getElementById("rodape").innerHTML = `
+    ${esc(i.nome)} v${esc(i.versao)} ·
+    <span title="Notas, cancelamentos e tomadores vêm do Sistema Nacional da NFS-e (Sefin e ADN) pelo seu certificado. Nada é cadastrado à mão.">
+      Dados: Ambiente Nacional da NFS-e</span> ·
+    <span title="Cópia local do que já foi baixado ou emitido (XMLs e o % do Simples). Pode apagar: o app baixa tudo de novo.">
+      Cópia local em <code>${esc(pasta)}</code></span>`;
+}
+
+async function iniciar() {
+  montarTopo();
+  montarRodape();
+  await sincronizarQuieto(estado.amb);
+  mostrar(estado.tela);
+}
+
+(async () => {
+  estado.info = await api("/api/info");
+  document.title = estado.info.nome;
+  document.getElementById("marca").textContent = estado.info.nome;
+  if (estado.info.temHomologacao) {
+    try { estado.amb = localStorage.getItem("amb") === "prod" ? "prod" : "hom"; } catch { estado.amb = "hom"; }
+  }
+  montarRodape();
+  try { estado.perfil = await api("/api/sessao"); iniciar(); }
+  catch { telaLogin(); }
+})();
+</script>
+</body>
+</html>
