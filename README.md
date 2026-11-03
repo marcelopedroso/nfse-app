@@ -53,6 +53,18 @@ leiaute do SefinNacional 1.6.0 (em uso em 11/2026), que rejeita uma cópia liter
 | E0625 | ME/EPP sem retenção de ISS: remove `pAliq` |
 | E0712 | Simples: `totTrib` vira `pTotTribSN` (% informado na tela e lembrado para as próximas notas) |
 
+**Produção e homologação estão em versões diferentes das regras** (11/2026). A homologação já roda as regras
+novas (RTC) e exige os ajustes da tabela acima. A produção ainda **recusa** o `finNFSe` (E1235). Por isso o
+formato depende do ambiente (`Leiaute` em `Dps.cs`):
+- **Produção:** a mesma estrutura da nota anterior, que a própria produção aceitou, trocando só o indicador de
+  tributos pelo % do Simples quando ele é informado.
+- **Homologação:** com os três ajustes da tabela.
+
+Se a Sefin recusar por um desses três códigos, o app ajusta e reenvia com o mesmo número. Recusa não cria nota,
+então reenviar é seguro. O formato que passou fica salvo por ambiente (`leiaute.json`), e isso já cobre o dia em
+que a produção adotar as regras novas. A bateria confere que a DPS de produção tem os mesmos campos, na mesma ordem,
+da nota anterior, e confere o ajuste automático contra a Sefin real, em homologação.
+
 Regras de segurança:
 - Nota cancelada nunca é usada como base.
 - O número da DPS é o maior número já autorizado na série + 1.

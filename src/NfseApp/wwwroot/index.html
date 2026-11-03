@@ -871,6 +871,7 @@ function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
             <div class="sub" style="margin:4px 0 14px">${esc(b.tomaNome)} · ${brl(dados.vServ)}</div>
             <div class="muted" style="font-size:12px;word-break:break-all">Chave ${esc(r.chave)}</div>
             ${r.alertas.length ? `<div style="margin-top:12px">${mensagem("info", "Alertas: " + r.alertas.map(esc).join("<br>"))}</div>` : ""}
+            ${r.ajustes?.length ? `<div style="margin-top:12px">${mensagem("info", "A Sefin recusou o primeiro formato (recusa não cria nota) e o app ajustou: " + r.ajustes.map(esc).join("; ") + ".")}</div>` : ""}
           </div>
           <div class="dlg-rodape">
             <a class="btn sec" href="/api/notas/${r.chave}/xml?amb=${estado.amb}">${icone("baixar")} XML</a>
@@ -885,7 +886,8 @@ function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
             ${esc(r.jaExistia.tomaNome)}, ${brl(r.jaExistia.vServ)}, emitida em ${data(r.jaExistia.dhProc)}.<br>
             Se essa é a nota que você queria (por exemplo, uma tentativa anterior que deu certo), <strong>não emita de novo</strong>.
             Se é outra nota, clique em “Tentar de novo”: o app usa o número seguinte.`)
-        : mensagem("erro", `Rejeitada (DPS nº ${r.nDps}):<br>` + r.erros.map(esc).join("<br>"));
+        : mensagem("erro", `Rejeitada (DPS nº ${r.nDps}). Nenhuma nota foi criada.<br>` + r.erros.map(esc).join("<br>")
+            + (r.ajustes?.length ? `<br>Ajustes já tentados: ${r.ajustes.map(esc).join("; ")}.` : ""));
       botao.textContent = "Tentar de novo";
       botao.disabled = prod && !$("confirmo").checked;
     } catch (e) {

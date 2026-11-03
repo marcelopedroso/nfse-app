@@ -9,7 +9,7 @@ using System.Xml.Linq;
 using NfseApp;
 
 var iAutoteste = Array.IndexOf(args, "--autoteste");
-if (iAutoteste >= 0) return Autoteste.Rodar(args.ElementAtOrDefault(iAutoteste + 1) ?? "autoteste-dps.xml");
+if (iAutoteste >= 0) return Autoteste.Rodar(args.ElementAtOrDefault(iAutoteste + 1) ?? "autoteste-dps.xml", args.ElementAtOrDefault(iAutoteste + 2));
 
 var portaPreferida = args.FirstOrDefault(a => int.TryParse(a, out _)) is { } p ? int.Parse(p) : Edicao.Porta;
 var abrirNavegador = !args.Contains("--sem-navegador");
@@ -171,39 +171,55 @@ app.MapPost("/api/emitir", async (EmitirReq req, HttpContext ctx) =>
     if (baseNota == null || baseNota.Cancelada) return Erro(400, "A nota-base não existe ou está cancelada.");
 
     var nDps = ProximoNDps(s.Info, destino, baseNota.Serie);
-    string idDps, assinada;
-    try
-    {
-        var xmlBase = repoProd.Xml(baseNota.Chave)!;
-        // Homologação nunca usa o e-mail da nota real (só um que a pessoa digitou para testar).
-        if (destino.TpAmb == 2 && email == Notas.LerTributacao(xmlBase).EmailTomador) email = "";
-        var dadosNota = new DadosNovaNota(req.DCompet, req.VServ, req.VDescIncond, req.Descricao.Trim(), req.PTotTribSN, fone, email);
-        var (id, dps) = Dps.Montar(xmlBase, dadosNota, destino, nDps);
-        idDps = id;
-        assinada = Dps.Assinar(dps, id, s.Cert);
-    }
-    catch (Exception e) { return Erro(400, e.Message); }
+    var xmlBase = repoProd.Xml(baseNota.Chave)!;
+    // Homologação nunca usa o e-mail da nota real (só um que a pessoa digitou para testar).
+    if (destino.TpAmb == 2 && email == Notas.LerTributacao(xmlBase).EmailTomador) email = "";
+    var dadosNota = new DadosNovaNota(req.DCompet, req.VServ, req.VDescIncond, req.Descricao.Trim(), req.PTotTribSN, fone, email);
 
     var api = new ApiNacional(s.Cert);
     var repoDestino = new Repositorio(s.Info.Documento, destino);
-    ResultadoEmissao resultado;
-    try { resultado = await api.Emitir(destino, assinada); }
-    catch (Exception e)
+    var leiaute = repoDestino.Leiaute ?? Leiaute.Padrao(destino);
+    var ajustes = new List<string>();
+    string idDps = "", assinada = "";
+    ResultadoEmissao? resultado = null;
+
+    // Recusa de leiaute (E1235 finNFSe, E0625, E0712) não cria nota: ajusta a DPS e reenvia com o mesmo número.
+    for (var tentativa = 1; tentativa <= 4; tentativa++)
     {
-        // A resposta se perdeu, mas a nota pode ter sido autorizada. Só a Sefin sabe: pergunta antes de deixar tentar de novo.
-        repoDestino.GuardarEmissao(idDps, assinada, null, null);
-        Nota? recuperada;
-        try { recuperada = await Recuperar(api, destino, repoDestino, idDps); }
-        catch
+        try
         {
-            return Results.Ok(new { ok = false, nDps, erros = new[] { "Falha de comunicação com a Sefin e não consegui confirmar se a nota saiu. NÃO emita de novo ainda: em alguns minutos vá em Notas → Atualizar do ADN e confira. (" + e.Message + ")" }, alertas = Array.Empty<string>(), ambiente = destino.Nome });
+            var (id, dps) = Dps.Montar(xmlBase, dadosNota, destino, nDps, leiaute);
+            idDps = id;
+            assinada = Dps.Assinar(dps, id, s.Cert);
         }
-        if (recuperada == null)
-            return Results.Ok(new { ok = false, nDps, erros = new[] { "Falha de comunicação com a Sefin, e ela confirma que essa DPS não virou nota. Pode tentar de novo. (" + e.Message + ")" }, alertas = Array.Empty<string>(), ambiente = destino.Nome });
-        return Results.Ok(new { ok = true, chave = recuperada.Chave, numero = recuperada.Numero.ToString(), nDps, erros = Array.Empty<string>(), alertas = new[] { "A resposta se perdeu na rede, mas a Sefin confirma que a nota foi autorizada." }, ambiente = destino.Nome });
+        catch (Exception e) { return Erro(400, e.Message); }
+
+        try { resultado = await api.Emitir(destino, assinada); }
+        catch (Exception e)
+        {
+            // A resposta se perdeu, mas a nota pode ter sido autorizada. Só a Sefin sabe: pergunta antes de deixar tentar de novo.
+            repoDestino.GuardarEmissao(idDps, assinada, null, null);
+            Nota? recuperada;
+            try { recuperada = await Recuperar(api, destino, repoDestino, idDps); }
+            catch
+            {
+                return Results.Ok(new { ok = false, nDps, erros = new[] { "Falha de comunicação com a Sefin e não consegui confirmar se a nota saiu. NÃO emita de novo ainda: em alguns minutos vá em Notas → Atualizar do ADN e confira. (" + e.Message + ")" }, alertas = Array.Empty<string>(), ajustes, ambiente = destino.Nome });
+            }
+            if (recuperada == null)
+                return Results.Ok(new { ok = false, nDps, erros = new[] { "Falha de comunicação com a Sefin, e ela confirma que essa DPS não virou nota. Pode tentar de novo. (" + e.Message + ")" }, alertas = Array.Empty<string>(), ajustes, ambiente = destino.Nome });
+            repoDestino.Leiaute = leiaute;
+            return Results.Ok(new { ok = true, chave = recuperada.Chave, numero = recuperada.Numero.ToString(), nDps, erros = Array.Empty<string>(), alertas = new[] { "A resposta se perdeu na rede, mas a Sefin confirma que a nota foi autorizada." }, ajustes, ambiente = destino.Nome });
+        }
+        if (resultado.Ok || leiaute.AjustarPara(resultado.Erros, ajustes) is not { } ajustado) break;
+        leiaute = ajustado;
     }
-    repoDestino.GuardarEmissao(idDps, assinada, resultado.Chave, resultado.NfseXml);
-    if (resultado.Ok && req.PTotTribSN is { } pct) repoProd.SalvarConfig(repoProd.Config with { PTotTribSN = pct });
+
+    repoDestino.GuardarEmissao(idDps, assinada, resultado!.Chave, resultado.NfseXml);
+    if (resultado.Ok)
+    {
+        repoDestino.Leiaute = leiaute; // a próxima nota deste ambiente já sai no formato que passou
+        if (req.PTotTribSN is { } pct) repoProd.SalvarConfig(repoProd.Config with { PTotTribSN = pct });
+    }
 
     // E0014: esse número de DPS já virou nota. Pode ser uma tentativa anterior que deu certo: mostra qual é em vez de pular número sozinho.
     Nota? jaExistia = null;
@@ -211,7 +227,7 @@ app.MapPost("/api/emitir", async (EmitirReq req, HttpContext ctx) =>
         try { jaExistia = await Recuperar(api, destino, repoDestino, idDps); } catch { /* sem a nota, o erro E0014 sozinho já explica */ }
 
     var numero = resultado.NfseXml != null ? XDocument.Parse(resultado.NfseXml).Descendants(Notas.N + "nNFSe").First().Value : null;
-    return Results.Ok(new { resultado.Ok, resultado.Status, resultado.Chave, numero, nDps, resultado.Erros, resultado.Alertas, ambiente = destino.Nome, jaExistia });
+    return Results.Ok(new { resultado.Ok, resultado.Status, resultado.Chave, numero, nDps, resultado.Erros, resultado.Alertas, ajustes, ambiente = destino.Nome, jaExistia });
 });
 
 app.MapGet("/api/notas/{chave}/xml", (string chave, string? amb, HttpContext ctx) =>

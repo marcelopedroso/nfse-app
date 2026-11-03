@@ -98,6 +98,14 @@ function Valor([xml]$doc, [string]$nome) {
     if ($n.Count -gt 0) { return $n[0].InnerText } else { return $null }
 }
 
+# Nomes dos campos do infDPS, em ordem (a "forma" da DPS, sem os valores).
+function Estrutura([xml]$doc) {
+    $inf = $doc.GetElementsByTagName('infDPS', $NS)[0]
+    $nomes = New-Object System.Collections.ArrayList
+    foreach ($n in $inf.SelectNodes('.//*')) { if ($n.NamespaceURI -eq $NS) { [void]$nomes.Add($n.LocalName) } }
+    return , $nomes
+}
+
 function ValidarXsd([string]$arquivo) {
     $pastaXsd = Join-Path $PSScriptRoot 'xsd'
     $config = New-Object System.Xml.XmlReaderSettings
@@ -235,7 +243,7 @@ try {
 
     # ------------------------------------------------------------------ assinatura sem rede
     Secao 'Assinatura sem rede (autoteste do .exe, nas duas edições)'
-    $pa = Start-Process -FilePath $exe -ArgumentList @('--autoteste', "`"$tmp\autoteste.xml`"") -PassThru -Wait `
+    $pa = Start-Process -FilePath $exe -ArgumentList @('--autoteste', "`"$tmp\autoteste.xml`"", "`"$tmp\autoteste-prod.xml`"") -PassThru -Wait `
         -RedirectStandardOutput "$tmp\autoteste.txt" -RedirectStandardError "$tmp\autoteste.err"
     $saidaAuto = (Get-Content "$tmp\autoteste.txt" -Raw -ErrorAction SilentlyContinue) + ''
     Ok 'o .exe monta e assina uma DPS e confere a assinatura' ($pa.ExitCode -eq 0 -and $saidaAuto -match 'AUTOTESTE OK') $saidaAuto
@@ -244,6 +252,20 @@ try {
         Ok 'DPS do autoteste passa no XSD oficial' ($errosXsd.Count -eq 0) ($errosXsd -join ' | ')
         Ok 'assinatura do autoteste confere (verificação independente)' (AssinaturaValida "$tmp\autoteste.xml")
     }
+
+    # Produção não tem schema público atual; a régua é a nota anterior, que a própria produção aceitou.
+    Secao 'DPS de produção (montada, nunca enviada) tem a forma que a produção já aceitou'
+    if (Test-Path "$tmp\autoteste-prod.xml") {
+        [xml]$dpsProd = Get-Content "$tmp\autoteste-prod.xml" -Raw -Encoding UTF8
+        [xml]$notaBase = (Chamar $cli GET "$base/api/notas/$($validas[0].chave)/xml?amb=prod").Texto
+        $formaBase = Estrutura $notaBase
+        $formaProd = foreach ($nome in (Estrutura $dpsProd)) { if ($nome -eq 'pTotTribSN' -and $formaBase -contains 'indTotTrib') { 'indTotTrib' } else { $nome } }
+        Ok 'sem finNFSe (a produção recusa: E1235)' ($formaProd -notcontains 'finNFSe' -or $formaBase -contains 'finNFSe')
+        Ok 'mesmos campos, na mesma ordem, da nota anterior' (($formaProd -join ',') -eq ($formaBase -join ',')) ("prod: " + ($formaProd -join ',') + " | base: " + ($formaBase -join ','))
+        Ok 'tpAmb de produção e % do Simples informado' ((Valor $dpsProd 'tpAmb') -eq '1' -and (Valor $dpsProd 'pTotTribSN') -eq '10.94')
+        Ok 'assinatura da DPS de produção confere' (AssinaturaValida "$tmp\autoteste-prod.xml")
+    }
+    else { Ok 'autoteste gerou a DPS de produção' $false }
 
     # ------------------------------------------------------------------ proteções de produção
     Secao 'Proteções de produção (nada chega à Sefin)'
@@ -341,6 +363,19 @@ try {
             [xml]$nf3 = (Chamar $cli GET "$base/api/notas/$($e3.chave)/xml?amb=hom").Texto
             if ($emailReal) { Ok 'e-mail real do cliente nunca vai em homologação' ($null -eq (Tomador $nf3 'email')) (Tomador $nf3 'email') }
         }
+
+        Secao 'Leiaute se ajusta sozinho às recusas da Sefin (sem criar nota)'
+        # Força a homologação a começar no formato de produção (sem finNFSe, com alíquota): a Sefin recusa
+        # (E1235, E0625) e o app tem que ajustar e reenviar até autorizar.
+        Set-Content "$pastaHom\leiaute.json" '{"FinNFSe":false,"SemAliquotaMeEpp":false,"TotalTributosSimples":false}' -Encoding ASCII
+        $r = Chamar $cli POST "$base/api/emitir" $valido
+        $e4 = $r.Json
+        Ok 'autoriza depois de se ajustar' ($e4.ok) $r.Texto
+        $textoAjustes = ($e4.ajustes -join ' | ')
+        Ok 'ajustou o finNFSe e a alíquota' ($textoAjustes -match 'finNFSe' -and $textoAjustes -match 'alíquota') $textoAjustes
+        $leiauteSalvo = Get-Content "$pastaHom\leiaute.json" -Raw | ConvertFrom-Json
+        Ok 'lembra o formato que passou' ($leiauteSalvo.FinNFSe -and $leiauteSalvo.SemAliquotaMeEpp) ($leiauteSalvo | ConvertTo-Json -Compress)
+        if ($e4.ok) { Write-Host "         NFS-e nº $($e4.numero) depois de: $textoAjustes" }
     }
 
     # ------------------------------------------------------------------ instância e porta

@@ -31,6 +31,14 @@ public class Repositorio
     }
 
     private string ArquivoEstado => Path.Combine(_dir, "estado.json");
+    private string ArquivoLeiaute => Path.Combine(_dir, "leiaute.json");
+
+    /// <summary>Último leiaute que a Sefin deste ambiente aceitou (null = ainda nenhum; usa o padrão).</summary>
+    public Leiaute? Leiaute
+    {
+        get => File.Exists(ArquivoLeiaute) ? JsonSerializer.Deserialize<Leiaute>(File.ReadAllText(ArquivoLeiaute)) : null;
+        set => File.WriteAllText(ArquivoLeiaute, JsonSerializer.Serialize(value));
+    }
     private string ArquivoConfig => Path.Combine(_raizDoc, "config.json");
 
     public long UltimoNsu =>
