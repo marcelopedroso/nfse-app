@@ -226,8 +226,16 @@ try {
     $html = [Net.WebUtility]::HtmlDecode($r.Texto)
     Ok 'DANFSe (HTML) é gerado' ($r.Status -eq 200 -and $html -match 'DANFSe v2\.0' -and $html -match 'Documento Auxiliar da NFS-e')
     Ok 'traz a chave, o número e o tomador' ($html.Contains($nv.chave) -and $html.Contains(">$($nv.numero)<") -and $html.Contains($nv.tomaNome))
-    Ok 'QR Code aponta para a consulta pública da chave' ($html -match '<svg' -and $html.Contains("data-qr=`"https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=$($nv.chave)`""))
-    Ok 'linha obrigatória de totais aproximados de tributos' ($html.Contains('Totais Aproximados dos Tributos cfe. Lei nº 12.741/2012'))
+    Ok 'QR Code aponta para a consulta pública da chave (mesmo endereço do portal)' ($html.Contains("data-qr=`"https://www.nfse.gov.br/ConsultaPublica?tpc=1&chave=$($nv.chave)`""))
+    # Modo byte, como o portal: 41 módulos (versão 6), PNG de 10 px por módulo. Compactando a chave, o QRCoder faria 37.
+    $larguraQr = 0
+    if ($html -match 'class="qr"[^>]*src="data:image/png;base64,([^"]+)"') {
+        $png = [Convert]::FromBase64String($Matches[1])
+        $larguraQr = ([int]$png[16] -shl 24) -bor ([int]$png[17] -shl 16) -bor ([int]$png[18] -shl 8) -bor [int]$png[19]
+    }
+    Ok 'QR Code com o mesmo tamanho do portal (41 módulos de 10 px)' ($larguraQr -eq 410) "largura $larguraQr"
+    Ok 'linha obrigatória de totais aproximados de tributos (texto do portal)' ($html.Contains('Totais aproximados dos Tributos cfe. Lei n° 12.741/2012: Federais: '))
+    Ok 'cabeçalho com os códigos, como o portal' ($html.Contains('Ambiente Gerador: ') -and $html.Contains('Tipo de Ambiente: 1'))
     Ok 'nota de produção não leva aviso de homologação' (-not $html.Contains('SEM VALIDADE'))
     Ok 'nota válida sem marca d''água' (-not $html.Contains('class="marca"'))
     if ($canceladas.Count -gt 0) {
@@ -346,7 +354,7 @@ try {
         Ok 'XML: valor líquido' ((Valor $nf 'vLiq') -eq '1134.56') (Valor $nf 'vLiq')
 
         $hh = [Net.WebUtility]::HtmlDecode((Chamar $cli GET "$base/api/notas/$($e1.chave)/danfse?amb=hom").Texto)
-        Ok 'DANFSe de homologação: "NFS-e SEM VALIDADE JURÍDICA"' ($hh.Contains('NFS-e SEM VALIDADE JURÍDICA') -and $hh.Contains('Tipo de Ambiente: Homologação'))
+        Ok 'DANFSe de homologação: "NFS-e SEM VALIDADE JURÍDICA"' ($hh.Contains('NFS-e SEM VALIDADE JURÍDICA') -and $hh.Contains('Tipo de Ambiente: 2'))
         Ok 'DANFSe mostra o e-mail editado e o valor' ($hh.Contains('teste.nfseapp@example.com') -and $hh.Contains('R$ 1.234,56'))
         $r = Chamar $cli POST "$base/api/notas/$($e1.chave)/portal?amb=hom" @{}
         Ok 'PDF oficial de homologação abre no portal da produção restrita' ($r.Json.url -eq "https://www.producaorestrita.nfse.gov.br/EmissorNacional/Notas/Visualizar/Index/$($e1.chave)") $r.Json.url
@@ -382,14 +390,21 @@ try {
         Secao 'Leiaute se ajusta sozinho às recusas da Sefin (sem criar nota)'
         # Força a homologação a começar no formato de produção (sem finNFSe, com alíquota): a Sefin recusa
         # (E1235, E0625) e o app tem que ajustar e reenviar até autorizar.
+        # A alíquota só é recusada se a nota-base tiver uma: as notas emitidas pelo app já saem sem (desde a NFS-e 1 / DPS 180).
+        $baseTemAliquota = (Chamar $cli GET "$base/api/notas/$($valido.baseChave)/xml?amb=prod").Texto -match '<pAliq>'
         Set-Content "$pastaHom\leiaute.json" '{"FinNFSe":false,"SemAliquotaMeEpp":false,"TotalTributosSimples":false}' -Encoding ASCII
         $r = Chamar $cli POST "$base/api/emitir" $valido
         $e4 = $r.Json
         Ok 'autoriza depois de se ajustar' ($e4.ok) $r.Texto
         $textoAjustes = ($e4.ajustes -join ' | ')
-        Ok 'ajustou o finNFSe e a alíquota' ($textoAjustes -match 'finNFSe' -and $textoAjustes -match 'alíquota') $textoAjustes
         $leiauteSalvo = Get-Content "$pastaHom\leiaute.json" -Raw | ConvertFrom-Json
-        Ok 'lembra o formato que passou' ($leiauteSalvo.FinNFSe -and $leiauteSalvo.SemAliquotaMeEpp) ($leiauteSalvo | ConvertTo-Json -Compress)
+        Ok 'ajustou o finNFSe e lembra o formato que passou' ($textoAjustes -match 'finNFSe' -and $leiauteSalvo.FinNFSe) "$textoAjustes / $($leiauteSalvo | ConvertTo-Json -Compress)"
+        if ($baseTemAliquota) {
+            Ok 'ajustou a alíquota (E0625) e lembra' ($textoAjustes -match 'alíquota' -and $leiauteSalvo.SemAliquotaMeEpp) $textoAjustes
+        } else {
+            Ok 'nota-base sem alíquota: não inventa ajuste de alíquota' (-not ($textoAjustes -match 'alíquota')) $textoAjustes
+            Aviso 'a nota-base não tem alíquota de ISS, então o ajuste do E0625 não foi exercitado contra a Sefin nesta rodada'
+        }
         if ($e4.ok) { Write-Host "         NFS-e nº $($e4.numero) depois de: $textoAjustes" }
     }
 

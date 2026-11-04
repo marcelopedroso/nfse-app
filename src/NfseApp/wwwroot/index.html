@@ -628,7 +628,7 @@ function desenharGrafico(alvo, meses) {
 
 // ---------- PDF ----------
 // O PDF oficial fica no portal nacional, que pede um captcha para baixar; o app abre a nota lá, no navegador da pessoa.
-// A prévia gerada pelo app (modelo da NT 008) fica na setinha, para quando o portal não estiver à mão.
+// O PDF gerado pelo app (mesmo modelo do portal, sem rede) fica na setinha, para quando o portal não estiver à mão.
 const botaoPdf = (chave, classe = "") => `<span class="dividido">
   <button class="btn sec ${classe}" data-pdf="${chave}" title="Abre a nota no portal nacional (Emissor Nacional), onde fica o PDF oficial">${icone("pdf")} PDF</button>
   <button class="btn sec ${classe}" data-pdf-menu="${chave}" title="Outras opções de PDF" aria-label="Outras opções de PDF" aria-haspopup="menu">${icone("abaixo")}</button>
@@ -653,8 +653,8 @@ function abrirMenuPdf(botao, chave) {
   menu.innerHTML = `
     <button role="menuitem" data-opcao="oficial"><strong>PDF oficial no portal</strong>
       <span>Abre a nota no Emissor Nacional. Para baixar, o portal pede o certificado e um captcha.</span></button>
-    <button role="menuitem" data-opcao="previa"><strong>Prévia gerada pelo app</strong>
-      <span>Na hora e sem internet, no modelo da NT 008/2026. Pode ter pequenas diferenças do oficial.</span></button>`;
+    <button role="menuitem" data-opcao="previa"><strong>PDF gerado pelo app</strong>
+      <span>Na hora e sem internet, no mesmo modelo e com o mesmo QR Code do PDF do portal.</span></button>`;
   // Dentro de um diálogo aberto, o menu precisa ficar no diálogo; fora dele, o diálogo cobriria o menu.
   (botao.closest("dialog") || document.body).appendChild(menu);
   const r = botao.getBoundingClientRect(), altura = menu.offsetHeight;

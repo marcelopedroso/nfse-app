@@ -141,18 +141,27 @@ e a API nacional de DANFSe está suspensa desde 03/08/2026
 Se o navegador não estiver logado no portal, ele cai no login. O acesso por certificado leva para a página inicial,
 que lista as últimas notas.
 
-Na setinha ao lado do botão fica a **prévia gerada pelo app**: na hora, sem rede, a partir do XML guardado
-(`Danfse.cs`), seguindo o modelo do Anexo I da NT 008. Ela não é idêntica ao PDF do portal (ex.: a linha de
-totais aproximados de tributos). A prévia segue:
-- A4, uma página, com as medidas, fontes e sombreamentos do item 2.4;
+Na setinha ao lado do botão fica o **PDF gerado pelo app**: na hora, sem rede, a partir do XML guardado
+(`Danfse.cs`). Ele segue o modelo do Anexo I da NT 008 e, onde a NT deixa margem, copia o PDF do portal:
+- medidas em pontos tiradas do PDF do portal. Sobrepondo os dois PDFs da mesma nota, os textos ficam a menos de
+  0,6 pt (0,2 mm) e as fontes e os tamanhos são os mesmos;
+- textos e formatos do portal: códigos no cabeçalho ("Ambiente Gerador: 2"), telefone e código IBGE formatados,
+  " / -" para código municipal e país ausentes, "0 - PIS/COFINS/CSLL Não Retidos", exclusões da base do IBS/CBS
+  calculadas, R$ 0,00 no IBS/CBS quando a nota não tem esse grupo;
+- telefone e e-mail do prestador só da DPS (nome e endereço vêm do cadastro quando a DPS não traz);
+- A4, uma página;
 - só o que está no XML; campo sem informação sai como "-" (nota 12);
-- QR Code apontando para a consulta pública da chave, gerado com a biblioteca QRCoder;
+- QR Code idêntico ao do portal, módulo por módulo: mesmo endereço (`ConsultaPublica?tpc=1&chave=`), modo byte
+  (`forceUtf8`), nível M, 41 módulos, imagem PNG de 10 px por módulo como a do portal (em SVG o Edge deformava os
+  módulos ao alinhar cada um à grade de pixels);
 - "NFS-e SEM VALIDADE JURÍDICA" em homologação, e marca d'água CANCELADA ou SUBSTITUÍDA;
 - nome do município pela tabela do IBGE (`assets/municipios.csv`, gerada por `tools/gerar_municipios.py`);
-- logo oficial da NFS-e (`assets/logo-nfse.png`).
+- logo da NFS-e igual ao do PDF do portal (`assets/logo-nfse.png`).
 
 O PDF é impresso pelo próprio Edge em modo headless. Sem Edge na máquina, o app devolve o HTML para imprimir pelo navegador.
-Para notas do Simples (`pTotTribSN`) ou sem total de tributos (`indTotTrib`), que a nota técnica não prevê na
-linha de "Totais Aproximados", o app mostra o que o XML traz.
+O Edge alinha cada linha de texto à grade de pixels (0,75 pt). Por isso as linhas divisórias são desenhadas fora do
+layout e há pequenos ajustes de posição por tipo de texto no CSS.
+Na linha de "Totais aproximados dos Tributos", o portal só mostra valores ou percentuais por esfera. O % do Simples
+(`pTotTribSN`) e o `indTotTrib` saem como "-", lá e aqui, embora estejam no XML.
 
 Ainda não faz: e-CPF, cancelamento e nota sem uma nota anterior para copiar.
