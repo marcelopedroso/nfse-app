@@ -276,6 +276,35 @@ app.MapPost("/api/notas/{chave}/portal", (string chave, string? amb, HttpContext
     return Results.Ok(new { url });
 });
 
+// E-mail para o tomador: PDF (o gerado pelo app, igual ao do portal) e XML anexados numa mensagem aberta no Outlook.
+// O app nunca envia: a pessoa confere e clica em Enviar. Com --sem-navegador (testes), só prepara os anexos.
+app.MapPost("/api/notas/{chave}/email", async (string chave, string? amb, HttpContext ctx) =>
+{
+    if (Sessao(ctx) is not { } s) return Erro(401, "Não logado.");
+    var repo = new Repositorio(s.Info.Documento, Ambiente.De(amb));
+    if (!Regex.IsMatch(chave, @"^\d{50}$") || repo.Todas().FirstOrDefault(n => n.Chave == chave) is not { } nota || repo.Xml(chave) is not { } xml)
+        return Erro(404, "Nota não encontrada.");
+    if (nota.PrestDoc != s.Info.Documento) return Erro(400, "Só dá para enviar por e-mail as notas que você emitiu.");
+    if (nota.Cancelada) return Erro(400, "Esta nota está cancelada.");
+
+    byte[]? pdf;
+    try { pdf = await Danfse.Pdf(Danfse.Html(xml, null)); }
+    catch (Exception e) { return Erro(500, "Não consegui gerar o PDF: " + e.Message); }
+    if (pdf == null) return Erro(500, "Não consegui gerar o PDF: o Microsoft Edge não está instalado.");
+
+    var email = Email.Montar(nota, Danfse.UrlConsulta + chave);
+    var pasta = Email.NovaPasta();
+    var arquivoPdf = Path.Combine(pasta, Email.NomeArquivo(nota) + ".pdf");
+    var arquivoXml = Path.Combine(pasta, Email.NomeArquivo(nota) + ".xml");
+    await File.WriteAllBytesAsync(arquivoPdf, pdf);
+    await File.WriteAllTextAsync(arquivoXml, xml);
+
+    string? falhaOutlook = null;
+    if (abrirNavegador && (falhaOutlook = await Email.AbrirNoOutlook(email, [arquivoPdf, arquivoXml], pasta)) != null)
+        Email.AbrirAlternativa(email, arquivoPdf);
+    return Results.Ok(new { email.Para, email.Assunto, anexos = new[] { arquivoPdf, arquivoXml }, outlook = abrirNavegador && falhaOutlook == null, falhaOutlook });
+});
+
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     // Com porta 0, só depois de subir dá para saber qual porta o sistema escolheu.

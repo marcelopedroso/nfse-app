@@ -19,7 +19,7 @@ public static class Danfse
 {
     private static readonly XNamespace N = Notas.N;
     private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
-    private const string UrlConsulta = "https://www.nfse.gov.br/ConsultaPublica?tpc=1&chave=";
+    public const string UrlConsulta = "https://www.nfse.gov.br/ConsultaPublica?tpc=1&chave=";
 
     // Descrições oficiais dos códigos, copiadas das anotações do XSD (tiposSimples_v1.01).
     private static readonly Dictionary<string, string> TpEmit = new() { ["1"] = "Prestador", ["2"] = "Tomador", ["3"] = "Intermediário" };

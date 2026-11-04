@@ -164,8 +164,14 @@
   /* ---------- listas ---------- */
   table.lista { width: 100%; border-collapse: collapse; }
   table.lista th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
-                   padding: 12px 14px; border-bottom: 1px solid var(--linha); }
-  table.lista td { padding: 12px 14px; border-bottom: 1px solid var(--linha); vertical-align: middle; }
+                   padding: 12px 8px; border-bottom: 1px solid var(--linha); }
+  table.lista td { padding: 12px 8px; border-bottom: 1px solid var(--linha); vertical-align: middle; }
+  table.lista th:first-child, table.lista td:first-child { padding-left: 16px; }
+  table.lista th:last-child, table.lista td:last-child { padding-right: 16px; }
+  #lista-notas { overflow-x: auto; }
+  td.acoes { width: 1%; }
+  .acoes .btn.icone { padding: 6px 7px; }
+  .acoes .dividido .btn + .btn { padding-left: 4px; padding-right: 4px; }
   table.lista tbody tr:hover { background: var(--campo); }
   table.lista tbody tr:last-child td { border-bottom: 0; }
   table.lista .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -176,6 +182,7 @@
   tr.cancelada .valor-cancelado { text-decoration: line-through; }
   .nome-doc .doc { font-size: 12px; color: var(--muted); }
   .acoes { white-space: nowrap; text-align: right; }
+  .btn.so-icone { padding-left: 7px; padding-right: 7px; }
   table.lista .nnota .dps { font-size: 11.5px; font-weight: 400; color: var(--muted); white-space: nowrap; }
   /* Botão dividido: a ação principal e, na setinha, as alternativas. */
   .dividido { display: inline-flex; }
@@ -320,6 +327,7 @@ const ICONES = {
   lua: '<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/>',
   seta: '<path d="m9 6 6 6-6 6"/>',
   abaixo: '<path d="m7 10 5 5 5-5"/>',
+  email: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="m4 6.5 8 6 8-6"/>',
   recolher: '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
   expandir: '<path d="m13 17 5-5-5-5M6 17l5-5-5-5"/>',
   certificado: '<rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M7 9h10M7 12.5h6"/><circle cx="17" cy="17.5" r="2.5"/>',
@@ -665,6 +673,26 @@ function abrirMenuPdf(botao, chave) {
   menu.querySelector("button").focus();
 }
 
+// ---------- e-mail ----------
+// O app só deixa a mensagem pronta no Outlook (PDF e XML anexados, assinatura da pessoa); quem envia é a pessoa.
+const botaoEmail = (n, classe = "", texto = "E-mail") =>
+  `<button class="btn sec ${classe}" data-email="${n.chave}" aria-label="Enviar por e-mail" title="Enviar por e-mail: abre um e-mail no Outlook${n.tomaEmail ? " para " + esc(n.tomaEmail) : ""} com o PDF e o XML da nota anexados. Você confere e clica em Enviar.">${icone("email")}${texto ? " " + texto : ""}</button>`;
+
+async function enviarEmail(chave, botao) {
+  const original = botao.innerHTML;
+  botao.disabled = true;
+  botao.innerHTML = botao.classList.contains("so-icone") ? `${icone("email")}…` : `${icone("email")} Preparando…`;
+  try {
+    const r = await post(`/api/notas/${chave}/email?amb=${estado.amb}`);
+    avisoFlutuante(r.outlook
+      ? `E-mail aberto no Outlook${r.para ? " para " + r.para : ""}, com o PDF e o XML anexados. Confira e clique em Enviar.`
+      : r.falhaOutlook
+        ? `Não consegui abrir o Outlook (${r.falhaOutlook}). Abri a pasta com o PDF e o XML e um e-mail novo no seu programa de e-mail: anexe os dois arquivos.`
+        : "PDF e XML prontos para o e-mail.");
+  } catch (e) { avisoFlutuante("Não consegui preparar o e-mail: " + e.message); }
+  finally { botao.disabled = false; botao.innerHTML = original; }
+}
+
 let temporizadorAviso;
 function avisoFlutuante(texto) {
   document.querySelector(".aviso-flutuante")?.remove();
@@ -678,8 +706,9 @@ function avisoFlutuante(texto) {
 }
 
 document.addEventListener("click", e => {
-  const pdf = e.target.closest("[data-pdf]"), menu = e.target.closest("[data-pdf-menu]");
-  if (pdf) abrirPdfOficial(pdf.dataset.pdf);
+  const pdf = e.target.closest("[data-pdf]"), menu = e.target.closest("[data-pdf-menu]"), email = e.target.closest("[data-email]");
+  if (email) { fecharMenuPdf(); enviarEmail(email.dataset.email, email); }
+  else if (pdf) abrirPdfOficial(pdf.dataset.pdf);
   else if (menu) {
     const aberto = menu.getAttribute("aria-expanded") === "true";
     fecharMenuPdf();
@@ -718,6 +747,7 @@ function tabelaNotas(lista, filtro, comTotais) {
           <td class="acoes">
             <a class="btn sec icone" href="/api/notas/${n.chave}/xml?amb=${estado.amb}" title="Baixar o XML oficial da nota (o documento fiscal em si)">${icone("baixar")} XML</a>
             ${botaoPdf(n.chave, "icone")}
+            ${filtro === "emitidas" && !n.cancelada ? botaoEmail(n, "icone so-icone", "") : ""}
           </td>
         </tr>`).join("")}
       </tbody>
@@ -957,6 +987,7 @@ function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
           <div class="dlg-rodape">
             <a class="btn sec" href="/api/notas/${r.chave}/xml?amb=${estado.amb}">${icone("baixar")} XML</a>
             ${botaoPdf(r.chave)}
+            ${botaoEmail({ chave: r.chave, tomaEmail: dados.emailTomador || b.tomaEmail }, "", "Enviar por e-mail")}
             <button class="btn" id="ver-notas">Ver notas</button>
           </div>`;
         $("ver-notas").onclick = () => { dlg.close(); mostrar("notas"); };

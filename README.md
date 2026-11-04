@@ -21,6 +21,13 @@ Os links sempre baixam a versão mais nova. As duas versões podem ficar abertas
 3. Na versão de teste, escolha o ambiente no topo da tela. **Homologação** é teste, sem valor fiscal.
    **Produção** emite a nota de verdade e só deixa emitir depois de marcar a confirmação.
 
+**Enviar a nota ao cliente:** o botão de e-mail (na lista e depois de emitir) abre uma mensagem nova no Outlook
+para o e-mail do tomador, com assunto, texto, a sua assinatura e o PDF e o XML da nota anexados. O app nunca envia
+sozinho: você confere e clica em Enviar. O remetente é a conta do seu Outlook. O Sistema Nacional não manda e-mail
+ao tomador; ele só disponibiliza a nota no Ambiente Nacional. Funciona com o Outlook clássico, por automação COM via
+PowerShell (`Email.cs`). Sem ele, o app abre a pasta com os arquivos e um e-mail novo no programa padrão, e aí os
+anexos vão à mão.
+
 Cada pessoa usa o certificado instalado na própria máquina. O app não tem servidor central e nenhum certificado
 sai do computador de ninguém. Como o `.exe` não é assinado, o Windows SmartScreen pode avisar na primeira execução
 ("Mais informações → Executar assim mesmo").

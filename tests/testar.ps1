@@ -195,6 +195,7 @@ try {
 
     $r = Chamar $cli GET "$base/api/notas?amb=prod"
     $emitidas = @($r.Json.emitidas)
+    $recebidasProd = @($r.Json.recebidas)
     Ok 'lista notas emitidas' ($r.Status -eq 200 -and $emitidas.Count -gt 0)
     Ok 'todas as emitidas são deste CNPJ' (@($emitidas | Where-Object { $_.prestDoc -ne $cnpj }).Count -eq 0)
     $canceladas = @($emitidas | Where-Object { $_.cancelada })
@@ -261,6 +262,32 @@ try {
     $r = Chamar (NovoCliente) POST "$base/api/notas/$($nv.chave)/portal?amb=prod" @{}
     Ok 'sem login: 401' ($r.Status -eq 401) "HTTP $($r.Status)"
     Ok 'nota mostra o número da DPS ao lado do da NFS-e' ($null -ne $nv.nDps -and $nv.nDps -gt 0) "nDps $($nv.nDps)"
+
+    Secao 'E-mail para o tomador (o app só prepara; quem envia é a pessoa, no Outlook)'
+    $r = Chamar $cli POST "$base/api/notas/$($nv.chave)/email?amb=prod" @{}
+    $em = $r.Json
+    Ok 'prepara o e-mail da nota' ($r.Status -eq 200) "HTTP $($r.Status) $($r.Texto)"
+    Ok 'para o e-mail do tomador da nota' ($em.para -eq $nv.tomaEmail) "$($em.para) vs $($nv.tomaEmail)"
+    Ok 'assunto com o número da nota e o prestador' ($em.assunto -eq "NFS-e nº $($nv.numero) - $($nv.prestNome)") $em.assunto
+    Ok 'sem janela (testes): não abre o Outlook' (-not $em.outlook -and -not $em.falhaOutlook)
+    $anexoPdf = @($em.anexos) | Where-Object { $_ -like '*.pdf' } | Select-Object -First 1
+    $anexoXml = @($em.anexos) | Where-Object { $_ -like '*.xml' } | Select-Object -First 1
+    Ok 'anexa o PDF da nota' ($anexoPdf -and (Test-Path -LiteralPath $anexoPdf) -and ([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($anexoPdf), 0, 5) -eq '%PDF-')) $anexoPdf
+    Ok 'anexa o XML da nota' ($anexoXml -and (Test-Path -LiteralPath $anexoXml) -and ((Get-Content -LiteralPath $anexoXml -Raw -Encoding UTF8) -match [regex]::Escape($nv.chave))) $anexoXml
+    Ok 'nome dos anexos com o número e o prestador' ((Split-Path $anexoPdf -Leaf) -eq "NFS-e $($nv.numero) - $($nv.prestNome).pdf") (Split-Path $anexoPdf -Leaf)
+    if ($anexoPdf) { Remove-Item -LiteralPath (Split-Path $anexoPdf -Parent) -Recurse -Force -ErrorAction SilentlyContinue }
+    $r = Chamar $cli POST "$base/api/notas/$($nv.chave)/email?amb=prod" @{} -SemCabecalho
+    Ok 'sem o cabeçalho do app: 403' ($r.Status -eq 403)
+    $r = Chamar $cli POST "$base/api/notas/$('9' * 50)/email?amb=prod" @{}
+    Ok 'nota que não é deste CNPJ: 404' ($r.Status -eq 404) "HTTP $($r.Status)"
+    if ($canceladas.Count -gt 0) {
+        $r = Chamar $cli POST "$base/api/notas/$($canceladas[0].chave)/email?amb=prod" @{}
+        Ok 'nota cancelada não vai por e-mail' ($r.Status -eq 400) "HTTP $($r.Status)"
+    }
+    if ($recebidasProd.Count -gt 0) {
+        $r = Chamar $cli POST "$base/api/notas/$($recebidasProd[0].chave)/email?amb=prod" @{}
+        Ok 'nota recebida (não emitida por você) não vai por e-mail' ($r.Status -eq 400) "HTTP $($r.Status)"
+    }
 
     # ------------------------------------------------------------------ assinatura sem rede
     Secao 'Assinatura sem rede (autoteste do .exe, nas duas edições)'
