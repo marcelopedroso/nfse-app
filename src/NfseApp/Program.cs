@@ -11,8 +11,20 @@ using NfseApp;
 var iAutoteste = Array.IndexOf(args, "--autoteste");
 if (iAutoteste >= 0) return Autoteste.Rodar(args.ElementAtOrDefault(iAutoteste + 1) ?? "autoteste-dps.xml", args.ElementAtOrDefault(iAutoteste + 2));
 
+// Quem é este .exe (versão e edição).
+if (args.Contains("--versao"))
+{
+    Console.WriteLine(Atualizacao.Identificacao(Edicao.Versao));
+    return 0;
+}
+// Instala este .exe no lugar da cópia instalada, sem perguntas (testes). Aberto à mão, a pergunta vem logo abaixo.
+if (args.Contains("--instalar")) return Instalacao.PorLinhaDeComando();
+
 var portaPreferida = args.FirstOrDefault(a => int.TryParse(a, out _)) is { } p ? int.Parse(p) : Edicao.Porta;
 var abrirNavegador = !args.Contains("--sem-navegador");
+
+// Um .exe mais novo que o instalado, aberto à mão: oferece instalar no lugar dele e abre o instalado.
+if (abrirNavegador && await Instalacao.Oferecer()) return 0;
 
 // Esta edição já está aberta: só abre outra janela para ela.
 if (await Instancia.JaAberta(portaPreferida))
@@ -276,8 +288,8 @@ app.MapPost("/api/notas/{chave}/portal", (string chave, string? amb, HttpContext
     return Results.Ok(new { url });
 });
 
-// E-mail para o tomador: PDF (o gerado pelo app, igual ao do portal) e XML anexados numa mensagem aberta no Outlook.
-// O app nunca envia: a pessoa confere e clica em Enviar. Com --sem-navegador (testes), só prepara os anexos.
+// E-mail para o tomador: PDF (o gerado pelo app, igual ao do portal) e XML anexados numa mensagem (.eml) aberta no
+// Outlook. O app nunca envia: a pessoa confere e clica em Enviar. Com --sem-navegador (testes), só cria o .eml.
 app.MapPost("/api/notas/{chave}/email", async (string chave, string? amb, HttpContext ctx) =>
 {
     if (Sessao(ctx) is not { } s) return Erro(401, "Não logado.");
@@ -293,16 +305,34 @@ app.MapPost("/api/notas/{chave}/email", async (string chave, string? amb, HttpCo
     if (pdf == null) return Erro(500, "Não consegui gerar o PDF: o Microsoft Edge não está instalado.");
 
     var email = Email.Montar(nota, Danfse.UrlConsulta + chave);
-    var pasta = Email.NovaPasta();
-    var arquivoPdf = Path.Combine(pasta, Email.NomeArquivo(nota) + ".pdf");
-    var arquivoXml = Path.Combine(pasta, Email.NomeArquivo(nota) + ".xml");
-    await File.WriteAllBytesAsync(arquivoPdf, pdf);
-    await File.WriteAllTextAsync(arquivoXml, xml);
+    var nome = Email.NomeArquivo(nota);
+    var eml = Email.CriarEml(email, Email.NovaPasta(), nome,
+        [(nome + ".pdf", "application/pdf", pdf), (nome + ".xml", "application/xml", Encoding.UTF8.GetBytes(xml))]);
 
-    string? falhaOutlook = null;
-    if (abrirNavegador && (falhaOutlook = await Email.AbrirNoOutlook(email, [arquivoPdf, arquivoXml], pasta)) != null)
-        Email.AbrirAlternativa(email, arquivoPdf);
-    return Results.Ok(new { email.Para, email.Assunto, anexos = new[] { arquivoPdf, arquivoXml }, outlook = abrirNavegador && falhaOutlook == null, falhaOutlook });
+    string? falha = null;
+    if (abrirNavegador && (falha = Email.Abrir(eml)) != null) Email.MostrarNaPasta(eml);
+    return Results.Ok(new { email.Para, email.Assunto, eml, aberto = abrirNavegador && falha == null, falha });
+});
+
+// Versão nova: o app só avisa e abre o download no navegador. Quem baixa é a pessoa; abrir o arquivo baixado instala.
+app.MapGet("/api/atualizacao", async (bool? forcar) =>
+{
+    try
+    {
+        var nova = await Atualizacao.Verificar(forcar == true);
+        return Results.Ok(new { atual = Edicao.Versao, nova = nova == null ? null : new { nova.Versao, nova.Notas } });
+    }
+    catch (Exception e) { return Results.Ok(new { atual = Edicao.Versao, nova = (object?)null, erro = e.Message }); }
+});
+
+app.MapPost("/api/atualizacao/baixar", async () =>
+{
+    NovaVersao? nova;
+    try { nova = await Atualizacao.Verificar(); }
+    catch (Exception e) { return Erro(502, "Não consegui consultar a versão nova: " + e.Message); }
+    if (nova == null) return Erro(404, "Não há versão mais nova publicada.");
+    if (abrirNavegador) Janela.AbrirNavegador(nova.Url);
+    return Results.Ok(new { url = nova.Url });
 });
 
 app.Lifetime.ApplicationStarted.Register(() =>

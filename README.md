@@ -13,6 +13,21 @@ Lista as notas emitidas e recebidas, os tomadores, e emite uma nota nova copiand
 Os links sempre baixam a versão mais nova. As duas versões podem ficar abertas ao mesmo tempo: usam portas
 (5199 e 5198) e janelas diferentes.
 
+### Atualizar
+
+Quando sai uma versão nova, aparece "Nova versão" na barra lateral do app, com o que mudou. O app só avisa e
+abre o download no navegador; ele nunca baixa `.exe` sozinho.
+1. Baixe o `.exe` novo (pelo aviso ou pelos links acima).
+2. Feche a janela do app.
+3. Abra o arquivo baixado. Se houver uma versão mais antiga instalada em `%LOCALAPPDATA%\NfseApp\bin\` (a que o
+   atalho da área de trabalho abre), ele pergunta se instala no lugar dela. Com "Sim", ele copia a antiga para
+   `NfseApp.anterior.exe`, se copia por cima dela, confere o SHA-256 e abre a instalada. O atalho continua o mesmo,
+   e as notas e configurações não mudam.
+
+Sem versão instalada, o `.exe` baixado só abre, como sempre: os dados ficam em `%LOCALAPPDATA%\NfseApp\{CNPJ}\`, e
+qualquer cópia do `.exe` vê os mesmos. Para voltar atrás, use o `NfseApp.anterior.exe` ou o link de uma versão
+anterior em Releases. A instalação está em `Instalacao.cs`; o aviso, em `Atualizacao.cs`.
+
 ## Usar
 
 1. Rode o `.exe` (duplo clique). Ele abre uma janela própria, um Edge em modo aplicativo sem barra de endereço.
@@ -22,11 +37,14 @@ Os links sempre baixam a versão mais nova. As duas versões podem ficar abertas
    **Produção** emite a nota de verdade e só deixa emitir depois de marcar a confirmação.
 
 **Enviar a nota ao cliente:** o botão de e-mail (na lista e depois de emitir) abre uma mensagem nova no Outlook
-para o e-mail do tomador, com assunto, texto, a sua assinatura e o PDF e o XML da nota anexados. O app nunca envia
-sozinho: você confere e clica em Enviar. O remetente é a conta do seu Outlook. O Sistema Nacional não manda e-mail
-ao tomador; ele só disponibiliza a nota no Ambiente Nacional. Funciona com o Outlook clássico, por automação COM via
-PowerShell (`Email.cs`). Sem ele, o app abre a pasta com os arquivos e um e-mail novo no programa padrão, e aí os
-anexos vão à mão.
+para o e-mail do tomador, com assunto, texto e o PDF e o XML da nota anexados. O app nunca envia sozinho: você
+confere e clica em Enviar. O remetente é a conta do seu Outlook. A assinatura não entra sozinha: no Outlook,
+*Inserir > Assinatura*. O Sistema Nacional não manda e-mail ao tomador; ele só disponibiliza a nota no Ambiente
+Nacional. A mensagem é um arquivo `.eml` marcado como não enviado (`X-Unsent: 1`), aberto com `OUTLOOK.EXE /eml`.
+Sem o Outlook clássico, o `.eml` abre no programa de e-mail padrão (`Email.cs`).
+
+**Regra do app: ele nunca chama o PowerShell nem roda scripts.** O antivírus corporativo trata isso como comportamento
+de ataque. O `tools/build.sh` recusa compilar se aparecer "powershell" no código do app.
 
 Cada pessoa usa o certificado instalado na própria máquina. O app não tem servidor central e nenhum certificado
 sai do computador de ninguém. Como o `.exe` não é assinado, o Windows SmartScreen pode avisar na primeira execução
@@ -89,10 +107,12 @@ Regras de segurança:
 ## Desenvolver
 
 ```bash
-tools/build.sh            # gera as duas versões (~19 MB) e roda a bateria de testes em cada .exe
+tools/build.sh            # gera as duas versões (~19 MB)
 ```
 
-`tools/build.sh` só termina com sucesso se todos os testes passarem. **Não publique um `.exe` que não passou por ele.**
+**Sem bateria automática por enquanto:** a antiga era um script PowerShell, e PowerShell é proibido na máquina de
+desenvolvimento, porque o antivírus corporativo reage. Ela foi removida e ainda não foi reescrita. Até lá, teste à mão
+antes de publicar, rodando o `.exe` direto (opções abaixo) e chamando a API dele com o `curl.exe` do Windows.
 Modos: `reduzido` (padrão, ~19 MB), `comprimido` (~45 MB) e `normal` (~95 MB).
 
 **Por que o `.exe` é grande:** o código do app tem menos de 300 KB. O resto é o .NET, que vai dentro do `.exe`
@@ -109,30 +129,22 @@ pelo interop. Opções de linha de comando:
 - um número: muda a porta preferida (ex.: `NfseApp.exe 5200`). Se a porta estiver ocupada por outro programa,
   o app sobe numa livre.
 - `--autoteste saida.xml`: monta e assina uma DPS sem rede e confere a assinatura.
+- `--versao`: escreve "NfseApp {versão} {arquivo da edição}" e sai.
+- `--instalar`: instala este `.exe` no lugar da cópia instalada sem perguntar (é o que os testes usam) e sai com um
+  código: 0 instalou, 2 sem instalação, 3 já atualizado, 4 a instalada está aberta, 5 a instalada é mais nova, 1 falha.
 
 Como é WinExe, ele não mostra erro de inicialização. Para ver o erro, rode `./NfseApp.exe --sem-navegador > saida.txt 2>&1`.
 
-### Testes (`tests/testar.ps1`)
+### Testes
 
-A bateria roda contra o `.exe` de verdade, no Windows, com o certificado instalado, numa pasta de dados temporária
-(`NFSEAPP_DADOS`) e em portas próprias (5290/5291). Ela cobre:
-- inicialização, segurança (403/401) e login;
-- leitura do ADN, notas, tomadores e XML;
-- DANFSe: conteúdo, QR Code, marca d'água, aviso de homologação, PDF de 1 página A4;
-- PDF oficial: abre a nota certa no portal de cada ambiente, e nada abre com chave inválida, sem login ou sem o cabeçalho do app;
-- proteções de produção;
-- validações dos campos;
-- emissão real em **homologação**, com o XML conferido campo a campo, a DPS validada no XSD oficial e a assinatura verificada;
-- E0014 sem nota em dobro;
-- autoteste de assinatura nas duas versões;
-- instância única e porta ocupada.
-
-Ela **nunca** manda confirmação de produção: os testes de proteção usam uma nota-base inexistente, então mesmo uma
-proteção quebrada pararia antes da Sefin.
+Não há bateria automática no momento (ver "Desenvolver"). A que existia rodava contra o `.exe` de verdade, numa pasta
+de dados temporária (`NFSEAPP_DADOS`), e cobria login, leitura do ADN, DANFSe, proteções de produção, emissão em
+homologação com XSD e assinatura, E0014, e-mail, aviso de versão e instalação local. A ideia é reescrevê-la como um
+`.exe` de testes em C#, sem scripts. Os XSD oficiais continuam em `tests/xsd/` para isso.
 
 ### Publicar uma versão
 
-Suba `<Version>` no `NfseApp.csproj`, rode `tools/build.sh` até dar `TUDO OK` e:
+Suba `<Version>` no `NfseApp.csproj`, rode `tools/build.sh`, teste à mão e:
 
 ```bash
 gh release create vX.Y.Z dist/reduzido/producao/NfseApp.exe dist/reduzido/teste/NfseApp-Teste.exe --title "vX.Y.Z" --notes "..."

@@ -2,14 +2,15 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Text;
-using System.Text.Json;
+using Microsoft.Win32;
 
 namespace NfseApp;
 
 public record EmailNota(string Para, string Assunto, string CorpoHtml, string CorpoTexto);
 
 /// <summary>
-/// E-mail da nota para o tomador: o app só deixa a mensagem pronta no Outlook (com o PDF anexado) e quem envia é a pessoa.
+/// E-mail da nota para o tomador: o app só deixa a mensagem pronta no Outlook (com o PDF e o XML anexados) e quem envia
+/// é a pessoa. Regra do app: não roda scripts nem shells de comando; a mensagem é um arquivo .eml.
 /// </summary>
 public static class Email
 {
@@ -30,7 +31,7 @@ public static class Email
     public static string NomeArquivo(Nota n) =>
         string.Concat($"NFS-e {n.Numero} - {n.PrestNome}".Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch)).Trim();
 
-    /// <summary>Pasta temporária dos anexos (o Outlook copia os arquivos para a mensagem). Limpa as de envios anteriores.</summary>
+    /// <summary>Pasta temporária do .eml de cada envio. Limpa as de envios anteriores.</summary>
     public static string NovaPasta()
     {
         var raiz = Path.Combine(Path.GetTempPath(), "NfseApp-email");
@@ -43,59 +44,89 @@ public static class Email
     }
 
     /// <summary>
-    /// Abre um e-mail novo no Outlook clássico com os anexos, por automação COM via PowerShell (o .exe é publicado com
-    /// trimming, que desliga o COM embutido do .NET). A assinatura padrão da pessoa entra no fim. Null = deu certo.
+    /// Monta a mensagem como um arquivo .eml (MIME) marcado com "X-Unsent: 1": o Outlook abre como mensagem nova,
+    /// pronta para conferir e enviar, com os anexos dentro do próprio arquivo. Sem "From": vale a conta do Outlook.
+    /// A assinatura não entra sozinha (no Outlook: Inserir > Assinatura).
     /// </summary>
-    public static async Task<string?> AbrirNoOutlook(EmailNota email, IEnumerable<string> anexos, string pasta)
+    public static string CriarEml(EmailNota email, string pasta, string nome, IEnumerable<(string Nome, string Tipo, byte[] Dados)> anexos)
     {
-        var dados = Path.Combine(pasta, "email.json");
-        var script = Path.Combine(pasta, "email.ps1");
-        await File.WriteAllTextAsync(dados, JsonSerializer.Serialize(new { para = email.Para, assunto = email.Assunto, corpo = email.CorpoHtml, anexos }), new UTF8Encoding(false));
-        await File.WriteAllTextAsync(script, ScriptOutlook, new UTF8Encoding(true));
-        var psi = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
-        foreach (var a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, dados }) psi.ArgumentList.Add(a);
+        var limite = "NfseApp-" + Guid.NewGuid().ToString("N");
+        var eml = new StringBuilder();
+        void Linha(string texto = "") => eml.Append(texto).Append("\r\n");
+        void Base64(byte[] dados)
+        {
+            var b64 = Convert.ToBase64String(dados);
+            for (var i = 0; i < b64.Length; i += 76) Linha(b64.Substring(i, Math.Min(76, b64.Length - i)));
+        }
+
+        if (email.Para != "") Linha($"To: {email.Para}");
+        Linha($"Subject: {Cabecalho(email.Assunto)}");
+        Linha("X-Unsent: 1");
+        Linha("MIME-Version: 1.0");
+        Linha($"Content-Type: multipart/mixed; boundary=\"{limite}\"");
+        Linha();
+        Linha($"--{limite}");
+        Linha("Content-Type: text/html; charset=\"utf-8\"");
+        Linha("Content-Transfer-Encoding: base64");
+        Linha();
+        Base64(Encoding.UTF8.GetBytes(email.CorpoHtml));
+        foreach (var (arquivo, tipo, dados) in anexos)
+        {
+            Linha($"--{limite}");
+            Linha($"Content-Type: {tipo}; name=\"{Ascii(arquivo)}\"");
+            Linha("Content-Transfer-Encoding: base64");
+            Linha($"Content-Disposition: attachment; filename=\"{Ascii(arquivo)}\"; filename*=UTF-8''{Uri.EscapeDataString(arquivo)}");
+            Linha();
+            Base64(dados);
+        }
+        Linha($"--{limite}--");
+
+        var caminho = Path.Combine(pasta, nome + ".eml");
+        File.WriteAllText(caminho, eml.ToString(), Encoding.ASCII);
+        return caminho;
+    }
+
+    /// <summary>
+    /// Abre o .eml no Outlook clássico ("OUTLOOK.EXE /eml") ou, sem ele, no programa de e-mail padrão do Windows.
+    /// Null = deu certo.
+    /// </summary>
+    public static string? Abrir(string eml)
+    {
         try
         {
-            using var processo = Process.Start(psi)!;
-            var erro = processo.StandardError.ReadToEndAsync();
-            using var limite = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-            try { await processo.WaitForExitAsync(limite.Token); }
-            catch (OperationCanceledException) { processo.Kill(true); return "o Outlook demorou demais para responder"; }
-            return processo.ExitCode == 0 ? null : (await erro).Trim() is { Length: > 0 } e ? e : $"código {processo.ExitCode}";
+            if (CaminhoOutlook() is { } outlook)
+            {
+                var psi = new ProcessStartInfo(outlook) { UseShellExecute = false };
+                psi.ArgumentList.Add("/eml");
+                psi.ArgumentList.Add(eml);
+                Process.Start(psi);
+            }
+            else Process.Start(new ProcessStartInfo(eml) { UseShellExecute = true });
+            return null;
         }
         catch (Exception e) { return e.Message; }
-        finally
-        {
-            try { File.Delete(script); File.Delete(dados); } catch { /* temporário */ }
-        }
     }
 
-    /// <summary>Sem Outlook clássico: abre a pasta com os anexos e um e-mail novo no programa padrão (mailto não anexa).</summary>
-    public static void AbrirAlternativa(EmailNota email, string anexoPrincipal)
+    /// <summary>Quando não deu para abrir o e-mail: mostra o .eml na pasta, para a pessoa abrir à mão.</summary>
+    public static void MostrarNaPasta(string eml)
     {
-        try { Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { "/select," + anexoPrincipal } }); } catch { /* sem Explorer */ }
-        var mailto = $"mailto:{Uri.EscapeDataString(email.Para)}?subject={Uri.EscapeDataString(email.Assunto)}&body={Uri.EscapeDataString(email.CorpoTexto)}";
-        Janela.AbrirNavegador(mailto);
+        try { Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { "/select," + eml } }); } catch { /* sem Explorer */ }
     }
 
-    // Display() antes do texto: é ele que põe a assinatura padrão no corpo; o texto entra logo depois do <body>.
-    private const string ScriptOutlook = """
-        param([string]$arquivo)
-        $ErrorActionPreference = 'Stop'
-        $d = Get-Content -LiteralPath $arquivo -Raw -Encoding UTF8 | ConvertFrom-Json
-        $outlook = New-Object -ComObject Outlook.Application
-        $m = $outlook.CreateItem(0)
-        $m.To = $d.para
-        $m.Subject = $d.assunto
-        foreach ($a in $d.anexos) { [void]$m.Attachments.Add([string]$a) }
-        $m.Display()
-        $html = [string]$m.HTMLBody
-        $b = $html.IndexOf('<body', [StringComparison]::OrdinalIgnoreCase)
-        if ($b -ge 0) {
-            $i = $html.IndexOf('>', $b) + 1
-            $m.HTMLBody = $html.Substring(0, $i) + $d.corpo + $html.Substring($i)
-        } else {
-            $m.HTMLBody = $d.corpo + $html
-        }
-        """;
+    // Caminho do Outlook clássico pelo registro do Windows (App Paths), o mesmo que o "Executar" usa.
+    private static string? CaminhoOutlook()
+    {
+        if (!OperatingSystem.IsWindows()) return null;
+        foreach (var raiz in new[] { Registry.CurrentUser, Registry.LocalMachine })
+            if (raiz.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE")?.GetValue(null) is string caminho
+                && File.Exists(caminho.Trim('"')))
+                return caminho.Trim('"');
+        return null;
+    }
+
+    // Cabeçalho com acento vai codificado (RFC 2047); o nome do anexo tem também a versão ASCII.
+    private static string Cabecalho(string texto) =>
+        texto.All(c => c < 128) ? texto : $"=?UTF-8?B?{Convert.ToBase64String(Encoding.UTF8.GetBytes(texto))}?=";
+
+    private static string Ascii(string texto) => new(texto.Select(c => c < 128 && c != '"' ? c : '_').ToArray());
 }

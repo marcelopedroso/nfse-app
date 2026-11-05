@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Gera as duas edições do app e roda a bateria de testes (tests/testar.ps1) em cada .exe gerado.
-# Termina com erro se qualquer teste falhar — só publique o que passou aqui.
+# Gera as duas edições do app. Não roda testes: a bateria antiga era em PowerShell, que é proibido nesta
+# máquina (o antivírus corporativo reage), e ainda não foi reescrita.
 #
 #   tools/build.sh [normal|comprimido|reduzido]     (padrão: reduzido)
 #
@@ -8,11 +8,16 @@
 #   comprimido  ~45 MB  mesmo conteúdo, comprimido dentro do .exe
 #   reduzido    ~18 MB  comprimido + remove do .NET o que o app não usa (trimming parcial)
 #
-# Roda no WSL; os testes rodam no Windows (powershell.exe), onde está o certificado.
+# Roda no WSL.
 set -euo pipefail
 
 modo=${1:-reduzido}
 raiz=$(cd "$(dirname "$0")/.." && pwd)
+
+# Regra do app: nunca chamar o PowerShell. Antivírus corporativo trata isso como comportamento de ataque.
+if grep -rniE 'powershell|pwsh' "$raiz/src" --exclude-dir=obj --exclude-dir=bin; then
+  echo "o app não pode chamar PowerShell (trechos acima)"; exit 1
+fi
 comum=(-c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
        -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none)
 
@@ -28,20 +33,17 @@ cd "$raiz/src/NfseApp"
 publicar() {  # $1 = teste|producao, demais = opções extras
   local edicao=$1; shift
   # Pasta intermediária própria por modo/edição: nada de reaproveitar compilação de outra variante.
-  dotnet publish "${comum[@]}" "${extra[@]}" "$@" \
-    -p:IntermediateOutputPath="obj/$modo-$edicao/" -p:OutputPath="bin/$modo-$edicao/" \
-    -o "$raiz/dist/$modo/$edicao" | grep -E "error|NfseApp.* -> .*dist" || true
+  # Falha de compilação para o build aqui: senão os testes rodariam no .exe da compilação anterior.
+  local saida
+  if ! saida=$(dotnet publish "${comum[@]}" "${extra[@]}" "$@" \
+      -p:IntermediateOutputPath="obj/$modo-$edicao/" -p:OutputPath="bin/$modo-$edicao/" \
+      -o "$raiz/dist/$modo/$edicao" 2>&1); then
+    echo "$saida" | grep -E "error" | sort -u; echo "não compilou ($edicao)"; exit 1
+  fi
+  echo "$saida" | grep -E "NfseApp.* -> .*dist" || true
 }
 publicar teste
 publicar producao -p:SoProducao=true
 
-falhou=0
-for exe in "$raiz/dist/$modo/teste/NfseApp-Teste.exe" "$raiz/dist/$modo/producao/NfseApp.exe"; do
-  [ -f "$exe" ] || { echo "não gerou $exe"; exit 1; }
-  echo
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$raiz/tests/testar.ps1")" \
-    -Exe "$(wslpath -w "$exe")" || falhou=1
-done
-
 echo
-if [ $falhou -eq 0 ]; then echo "TUDO OK ($modo): pode publicar dist/$modo/"; else echo "HOUVE FALHA ($modo): não publique"; exit 1; fi
+echo "Gerado em dist/$modo/ — sem bateria automática. Teste à mão antes de publicar."

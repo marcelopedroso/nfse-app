@@ -87,6 +87,9 @@
   .recolher:hover { color: var(--lat-txt); background: var(--lat-ativo); }
   .recolher kbd { margin-left: auto; font: inherit; font-size: 11px; color: var(--lat-sub); border: 1px solid var(--lat-linha); border-radius: 4px; padding: 0 5px; }
   .amb-recolhido { display: none; }
+  .atualizar-lat { display: flex; align-items: center; gap: 8px; background: var(--btn); color: var(--btn-txt); border: 0; border-radius: 7px;
+                   padding: 7px 10px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+  .atualizar-lat:hover { background: var(--btn-hover); }
 
   /* Barra recolhida (botão "Recolher" ou Ctrl+B): só ícones; o nome aparece no title de cada um. */
   .lateral { transition: width .18s ease, padding .18s ease; }
@@ -97,6 +100,7 @@
   :root[data-barra="recolhida"] .lateral :is(.btn-nova, .nav button) { padding-left: 0; padding-right: 0; }
   :root[data-barra="recolhida"] .acoes-lat { flex-direction: column; }
   :root[data-barra="recolhida"] .amb-recolhido { display: flex; justify-content: center; }
+  :root[data-barra="recolhida"] .atualizar-lat { justify-content: center; padding: 7px 0; }
 
   main { flex: 1; min-width: 0; padding: 30px 36px 48px; }
   .conteudo { max-width: 1120px; margin: 0 auto; }
@@ -183,6 +187,10 @@
   .nome-doc .doc { font-size: 12px; color: var(--muted); }
   .acoes { white-space: nowrap; text-align: right; }
   .btn.so-icone { padding-left: 7px; padding-right: 7px; }
+  .notas-versao { font-size: 13.5px; line-height: 1.55; margin-bottom: 12px; }
+  .notas-versao ul { margin: 0 0 0 18px; padding: 0; }
+  .notas-versao li { margin-bottom: 6px; }
+  .passos { margin: 0 0 0 18px; padding: 0; font-size: 13.5px; line-height: 1.6; }
   table.lista .nnota .dps { font-size: 11.5px; font-weight: 400; color: var(--muted); white-space: nowrap; }
   /* Botão dividido: a ação principal e, na setinha, as alternativas. */
   .dividido { display: inline-flex; }
@@ -403,6 +411,7 @@ function montarLateral() {
       <button data-tela="tomadores" title="Tomadores">${icone("tomadores")}<span class="txt">Tomadores</span></button>
     </nav>
     <div class="rodape-lat">
+      ${estado.atualizacao ? `<button class="atualizar-lat" id="atualizar" title="Versão ${esc(estado.atualizacao.versao)} disponível. Clique para ver o que mudou e como atualizar.">${icone("atualizar")}<span class="txt">Nova versão: v${esc(estado.atualizacao.versao)}</span></button>` : ""}
       ${i.temHomologacao ? `<div>
         <div class="rotulo-lat">Ambiente</div>
         <div class="segmentado" title="Homologação: ambiente de testes da Receita, sem validade fiscal. Produção: notas com validade fiscal.">
@@ -424,6 +433,7 @@ function montarLateral() {
         v${esc(i.versao)} · dados do Ambiente Nacional</div>
     </div>`;
   lat.querySelectorAll("[data-tela]").forEach(b => b.onclick = () => mostrar(b.dataset.tela));
+  $("atualizar")?.addEventListener("click", abrirAtualizacao);
   lat.querySelectorAll("[data-amb]").forEach(b => b.onclick = async () => {
     if (estado.amb === b.dataset.amb) return;
     estado.amb = b.dataset.amb;
@@ -684,11 +694,11 @@ async function enviarEmail(chave, botao) {
   botao.innerHTML = botao.classList.contains("so-icone") ? `${icone("email")}…` : `${icone("email")} Preparando…`;
   try {
     const r = await post(`/api/notas/${chave}/email?amb=${estado.amb}`);
-    avisoFlutuante(r.outlook
-      ? `E-mail aberto no Outlook${r.para ? " para " + r.para : ""}, com o PDF e o XML anexados. Confira e clique em Enviar.`
-      : r.falhaOutlook
-        ? `Não consegui abrir o Outlook (${r.falhaOutlook}). Abri a pasta com o PDF e o XML e um e-mail novo no seu programa de e-mail: anexe os dois arquivos.`
-        : "PDF e XML prontos para o e-mail.");
+    avisoFlutuante(r.aberto
+      ? `E-mail aberto no Outlook${r.para ? " para " + r.para : ""}, com o PDF e o XML anexados. Confira e clique em Enviar. A assinatura não entra sozinha: no Outlook, Inserir > Assinatura.`
+      : r.falha
+        ? `Não consegui abrir o e-mail (${r.falha}). Abri a pasta com o arquivo do e-mail: dê dois cliques nele para abrir no Outlook.`
+        : "E-mail pronto.");
   } catch (e) { avisoFlutuante("Não consegui preparar o e-mail: " + e.message); }
   finally { botao.disabled = false; botao.innerHTML = original; }
 }
@@ -1013,8 +1023,64 @@ function abrirConfirmacao(info, prod, dados, baseDe, imposto) {
 // ---------- início do app ----------
 async function iniciar() {
   montarLateral();
+  verificarAtualizacao();
   await sincronizarQuieto(estado.amb);
   mostrar(estado.tela);
+}
+
+// ---------- versão nova ----------
+// O app só avisa e abre o download no navegador. Abrir o arquivo baixado instala ele no lugar desta versão.
+let consultaAtualizacao;
+async function verificarAtualizacao() {
+  clearTimeout(consultaAtualizacao);
+  consultaAtualizacao = setTimeout(verificarAtualizacao, 6 * 3600 * 1000);
+  try {
+    const r = await api("/api/atualizacao");
+    if (!r.nova || r.nova.versao === estado.atualizacao?.versao) return;
+    estado.atualizacao = r.nova;
+    if (estado.perfil) { montarLateral(); marcarMenu(); }
+  } catch { /* sem internet ou GitHub fora: tenta de novo mais tarde */ }
+}
+
+// Notas da versão (Markdown simples do GitHub): "- item" vira lista e **texto** vira negrito.
+function notasVersao(md) {
+  const negrito = t => t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  let html = "", lista = false;
+  for (const linha of esc(md).split(/\r?\n/).filter(l => l.trim())) {
+    const item = linha.match(/^\s*[-*] (.*)$/);
+    if (item && !lista) { html += "<ul>"; lista = true; }
+    if (!item && lista) { html += "</ul>"; lista = false; }
+    html += item ? `<li>${negrito(item[1])}</li>` : `<p>${negrito(linha)}</p>`;
+  }
+  return html + (lista ? "</ul>" : "");
+}
+
+function abrirAtualizacao() {
+  const n = estado.atualizacao, dlg = $("confirmar");
+  dlg.innerHTML = `
+    <div class="dlg-cab"><h2>Nova versão: v${esc(n.versao)}</h2></div>
+    <div class="dlg-corpo">
+      <div class="sub" style="margin-bottom:12px">Você está na v${esc(estado.info.versao)}.</div>
+      ${n.notas ? `<div class="notas-versao">${notasVersao(n.notas)}</div>` : ""}
+      <ol class="passos">
+        <li>Clique em <strong>Baixar</strong>: o download abre no navegador.</li>
+        <li>Feche esta janela do app.</li>
+        <li>Abra o arquivo baixado e confirme: ele se instala no lugar desta versão, e o atalho continua o mesmo.</li>
+      </ol>
+    </div>
+    <div class="dlg-acao"><div id="atu-resultado"></div></div>
+    <div class="dlg-rodape">
+      <button class="btn sec" id="atu-fechar">Agora não</button>
+      <button class="btn" id="atu-baixar">${icone("baixar")} Baixar</button>
+    </div>`;
+  dlg.showModal();
+  $("atu-fechar").onclick = () => dlg.close();
+  $("atu-baixar").onclick = async () => {
+    try {
+      await post("/api/atualizacao/baixar");
+      $("atu-resultado").innerHTML = mensagem("ok", "Download aberto no navegador. Quando terminar, feche esta janela e abra o arquivo baixado.");
+    } catch (e) { $("atu-resultado").innerHTML = mensagem("erro", esc(e.message)); }
+  };
 }
 
 (async () => {

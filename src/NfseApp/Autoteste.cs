@@ -5,7 +5,7 @@ namespace NfseApp;
 
 /// <summary>
 /// Autoteste sem rede: monta e assina uma DPS a partir da última nota já baixada e confere a assinatura.
-/// Existe para a bateria (tests/testar.ps1) exercitar a assinatura também na edição só-produção, que nunca emite em teste,
+/// Existe para exercitar a assinatura também na edição só-produção, que nunca emite em teste,
 /// e para pegar o que o trimming possa ter removido. Uso: NfseApp.exe --autoteste saida-hom.xml saida-prod.xml
 /// (a DPS de produção nunca é enviada: só é gravada para a bateria validar contra o schema de produção).
 /// </summary>
